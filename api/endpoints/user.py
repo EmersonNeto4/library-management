@@ -1,4 +1,4 @@
 from flask import Blueprint
-from api.auth import require_role
+from ..auth import require_role
 
 user_bp = Blueprint('user', __name__)

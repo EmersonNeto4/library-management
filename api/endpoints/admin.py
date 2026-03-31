@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify
-from api.auth import require_role
+from ..auth import require_role
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 

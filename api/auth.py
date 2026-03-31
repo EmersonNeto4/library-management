@@ -1,5 +1,5 @@
 from flask import request, jsonify
-from db import get_db_connection
+from .db import get_db_connection
 import hashlib
 import functools
 
