@@ -2,3 +2,5 @@ Definir que encriptação usar (a princípio hash MD5)
 
 O @require_role(...) em api-auth actua como uma portagem — antes de entrar no endpoint, verifica sempre autenticação e permissões. 
 Se falhar em qualquer ponto, devolve o erro e o código do endpoint nunca chega a executar.
+
+Cada ficheiro de endpoints usa um Blueprint — é a forma do Flask organizar rotas em ficheiros separados.
