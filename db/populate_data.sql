@@ -2,7 +2,7 @@
 -- Library Management System
 -- Data Management Systems Project 2025/2026
 -- POPULATE DATA — Semana 2
--- Géneros + Autores + Livros
+-- Géneros + Autores + Livros + Utilizadores
 -- =============================================
 -- ESTRUTURA:
 --   10 géneros
@@ -11,6 +11,7 @@
 --      → 80 livros exclusivos por género (80%)
 --      → 20 livros partilhados com o género seguinte (20%)
 --   author_books: 1 autor principal + ~33% com 2º autor
+--   1 admin + 1 librarian + 100 readers
 -- =============================================
 
 
@@ -151,11 +152,8 @@ FROM generate_series(1, 1000) AS s(i);
 
 
 -- ── 4. BOOKS_GENRES ──────────────────────────
--- Cada género g (1..10) cobre livros (g-1)*100+1 até g*100
--- Livros 1-80 de cada grupo  → exclusivos do género principal       (80%)
--- Livros 81-100 de cada grupo → também no género seguinte ciclico   (20%)
--- Exemplo: livros 81-100 do género 1 (Fiction)  também são Mystery
--- Exemplo: livros 981-1000 do género 10 (Horror) também são Fiction
+-- Livros 1-80 de cada grupo   → exclusivos do género principal (80%)
+-- Livros 81-100 de cada grupo → também no género seguinte cíclico (20%)
 
 -- 4a. Atribuição base — todos os 1000 livros ao seu género principal
 INSERT INTO books_genres (books_isbn, genres_genre_id)
@@ -194,7 +192,47 @@ WHERE i % 3 = 0
   AND (i % 50) + 1 <> ((i - 1) % 50) + 1;
 
 
--- ── 6. VERIFICAÇÃO ───────────────────────────
+-- ── 6. UTILIZADORES — Admin e Librarian ──────
+
+INSERT INTO users (username, email, password, created_at) VALUES
+    ('admin1',     'admin@library.com',     'password123', NOW()),
+    ('librarian1', 'librarian@library.com', 'password123', NOW());
+
+INSERT INTO admin (users_user_id, admin_level)
+VALUES (
+    (SELECT user_id FROM users WHERE username = 'admin1'), 1
+);
+
+INSERT INTO librarian (users_user_id, n_mec)
+VALUES (
+    (SELECT user_id FROM users WHERE username = 'librarian1'), 12345
+);
+
+
+-- ── 7. UTILIZADORES — 100 Readers ────────────
+-- username:    reader_001 a reader_100
+-- email:       reader001@library.com a reader100@library.com
+-- n_estudante: 2020000001 a 2020000100
+-- created_at:  datas variadas nos últimos 2 anos
+
+INSERT INTO users (username, email, password, created_at)
+SELECT
+    'reader_' || LPAD(i::text, 3, '0'),
+    'reader'  || LPAD(i::text, 3, '0') || '@library.com',
+    'password123',
+    NOW() - (i * INTERVAL '7 days')   -- espaçados 7 dias entre si
+FROM generate_series(1, 100) AS s(i);
+
+INSERT INTO reader (users_user_id, n_estudante)
+SELECT
+    user_id,
+    2020000000 + ROW_NUMBER() OVER (ORDER BY user_id)
+FROM users
+WHERE username LIKE 'reader_%'
+ORDER BY user_id;
+
+
+-- ── 8. VERIFICAÇÃO ───────────────────────────
 
 -- Verificação 1: livros por género (deve ser 100 em todos)
 SELECT
@@ -241,3 +279,10 @@ FROM (
 ) sub
 GROUP BY author_count
 ORDER BY author_count;
+
+-- Verificação 4: utilizadores por tipo (admin=1, librarian=1, reader=100)
+SELECT 'admin'     AS tipo, COUNT(*) AS total FROM admin
+UNION ALL
+SELECT 'librarian' AS tipo, COUNT(*) AS total FROM librarian
+UNION ALL
+SELECT 'reader'    AS tipo, COUNT(*) AS total FROM reader;
