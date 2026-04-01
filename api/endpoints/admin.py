@@ -29,7 +29,7 @@ def register_user(user_id, role):
     if new_role == "admin" and "admin_level" not in data:
         return jsonify({"error": "Campo obrigatório em falta: admin_level"}), 400
     
-    conn = get_db_connection()
+    conn = get_connection()
     cur = conn.cursor()
 
     try:
