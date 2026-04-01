@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from ..auth import require_role
 from ..db import get_db_connection
+import hashlib
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -42,6 +43,8 @@ def register_user(user_id, role):
         if cur.fetchone():
             return jsonify({'error': 'Email já existe'}), 409
         
+        password_hash = hashlib.md5(data["password"].encode()).hexdigest()
+
         # inserir em users
         cur.execute(
             """
@@ -49,7 +52,7 @@ def register_user(user_id, role):
             VALUES (%s, %s, %s, NOW())
             RETURNING user_id
             """,
-            (data["username"], data["email"], data["password"])
+            (data["username"], data["email"], password_hash)
         )
         new_user_id = cur.fetchone()[0]
 
