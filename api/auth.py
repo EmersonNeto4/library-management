@@ -1,10 +1,10 @@
 from flask import request, jsonify
-from .db import get_db_connection
+from .db import get_connection
 import hashlib
 import functools
 
 def check_auth(username, password):
-    conn = get_db_connection()
+    conn = get_connection()
     cur = conn.cursor()
 
     #password guardada com hash MD5 (ajustar ao que o Gonçalo definir)
