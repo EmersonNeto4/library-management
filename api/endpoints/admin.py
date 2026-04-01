@@ -1,9 +1,9 @@
 from flask import Blueprint, jsonify, request
 from ..auth import require_role
-from ..db import get_db_connection
+from ..db import get_connection
 import hashlib
 
-admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
+admin_bp = Blueprint('admin', __name__)
 
 @admin_bp.route('/user', methods=['POST'])
 @require_role('admin')
