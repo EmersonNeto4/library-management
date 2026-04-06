@@ -109,10 +109,10 @@ def add_book(user_id, role):
         # Inserir o livro
         cur.execute(
             """
-            INSERT INTO books (isbn, title, author, description, pages, copies)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO books (isbn, title, description, pages, copies)
+            VALUES (%s, %s, %s, %s, %s)
             """,
-            (data["isbn"], data["title"], data["author"], data["description"], data["pages"], data["copies"])
+            (data["isbn"], data["title"], data["description"], data["pages"], data["copies"])
         )
 
         # Inserir os gêneros do livro
@@ -125,7 +125,7 @@ def add_book(user_id, role):
             if not genre_id:
                 return jsonify({'error': f'Gênero não encontrado: {genre}'}), 400
             cur.execute(
-                "INSERT INTO book_genres (books_isbn, genres_genre_id) VALUES (%s, %s)",
+                "INSERT INTO books_genres (books_isbn, genres_genre_id) VALUES (%s, %s)",
                 (data["isbn"], genre_id[0])
             )
         
@@ -133,20 +133,20 @@ def add_book(user_id, role):
         for author in data["author"].split(","):
             author = author.strip()
             cur.execute(
-                "SELECT author_id FROM authors WHERE name = %s",
+                "SELECT author_id FROM author WHERE name = %s",
                 (author,)
             )
             author_id = cur.fetchone()
             if not author_id:
                 cur.execute(
-                    "INSERT INTO authors (name) VALUES (%s) RETURNING author_id",
+                    "INSERT INTO author (name) VALUES (%s) RETURNING author_id",
                     (author,)
                 )
                 author_id = cur.fetchone()[0]
             else:
                 author_id = author_id[0]
             cur.execute(
-                "INSERT INTO authors_book (author_author_id, books_isbn) VALUES (%s, %s)",
+                "INSERT INTO author_books (author_author_id, books_isbn) VALUES (%s, %s)",
                 (author_id, data["isbn"])
             )
         
