@@ -84,3 +84,56 @@ def register_user(user_id, role):
     finally:
         cur.close()
         conn.close()
+
+@admin_bp.route('/book', methods=['POST'])
+@require_role('admin')
+def add_book(user_id, role):
+    data = request.get_json()
+
+    # Validar campos obrigatórios
+    required = ["isbn","title", "author", "description", "pages", "copies", "genres"]
+
+    for field in required:
+        if field not in data:
+            return jsonify({'error': f'Campo obrigatório em falta: {field}'}), 400
+        
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        # Verificar se o livro já existe
+        cur.execute("SELECT isbn FROM books WHERE isbn = %s", (data["isbn"],))
+        if cur.fetchone():
+            return jsonify({'error': 'Livro com este ISBN já existe'}), 409
+        
+        # Inserir o livro
+        cur.execute(
+            """
+            INSERT INTO books (isbn, title, author, description, pages, copies)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (data["isbn"], data["title"], data["author"], data["description"], data["pages"], data["copies"])
+        )
+
+        # Inserir os gêneros do livro
+        for genre in data["genres"]:
+            cur.execute( 
+                "SELECT genre_id FROM genres WHERE genre_name = %s",
+                (genre,)
+            )
+            genre_id = cur.fetchone()
+            if not genre_id:
+                return jsonify({'error': f'Gênero não encontrado: {genre}'}), 400
+            cur.execute(
+                "INSERT INTO book_genres (books_isbn, genres_genre_id) VALUES (%s, %s)",
+                (data["isbn"], genre_id[0])
+            )
+        
+        conn.commit()
+        return jsonify({"message": "Livro adicionado com sucesso", "isbn": data["isbn"]}), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
