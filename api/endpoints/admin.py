@@ -84,3 +84,77 @@ def register_user(user_id, role):
     finally:
         cur.close()
         conn.close()
+
+@admin_bp.route('/book', methods=['POST'])
+@require_role('admin')
+def add_book(user_id, role):
+    data = request.get_json()
+
+    # Validar campos obrigatórios
+    required = ["isbn","title", "author", "description", "pages", "copies", "genres"]
+
+    for field in required:
+        if field not in data:
+            return jsonify({'error': f'Campo obrigatório em falta: {field}'}), 400
+        
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        # Verificar se o livro já existe
+        cur.execute("SELECT isbn FROM books WHERE isbn = %s", (data["isbn"],))
+        if cur.fetchone():
+            return jsonify({'error': 'Livro com este ISBN já existe'}), 409
+        
+        # Inserir o livro
+        cur.execute(
+            """
+            INSERT INTO books (isbn, title, description, pages, copies)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (data["isbn"], data["title"], data["description"], data["pages"], data["copies"])
+        )
+
+        # Inserir os gêneros do livro
+        for genre in data["genres"]:
+            cur.execute( 
+                "SELECT genre_id FROM genres WHERE genre_name = %s",
+                (genre,)
+            )
+            genre_id = cur.fetchone()
+            if not genre_id:
+                return jsonify({'error': f'Gênero não encontrado: {genre}'}), 400
+            cur.execute(
+                "INSERT INTO books_genres (books_isbn, genres_genre_id) VALUES (%s, %s)",
+                (data["isbn"], genre_id[0])
+            )
+        
+        # Inserir os autores do livro
+        for author in data["author"].split(","):
+            author = author.strip()
+            cur.execute(
+                "SELECT author_id FROM author WHERE name = %s",
+                (author,)
+            )
+            author_id = cur.fetchone()
+            if not author_id:
+                cur.execute(
+                    "INSERT INTO author (name) VALUES (%s) RETURNING author_id",
+                    (author,)
+                )
+                author_id = cur.fetchone()[0]
+            else:
+                author_id = author_id[0]
+            cur.execute(
+                "INSERT INTO author_books (author_author_id, books_isbn) VALUES (%s, %s)",
+                (author_id, data["isbn"])
+            )
+        
+        conn.commit()
+        return jsonify({"message": "Livro adicionado com sucesso", "isbn": data["isbn"]}), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
