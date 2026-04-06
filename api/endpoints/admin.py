@@ -129,6 +129,27 @@ def add_book(user_id, role):
                 (data["isbn"], genre_id[0])
             )
         
+        # Inserir os autores do livro
+        for author in data["author"].split(","):
+            author = author.strip()
+            cur.execute(
+                "SELECT author_id FROM authors WHERE name = %s",
+                (author,)
+            )
+            author_id = cur.fetchone()
+            if not author_id:
+                cur.execute(
+                    "INSERT INTO authors (name) VALUES (%s) RETURNING author_id",
+                    (author,)
+                )
+                author_id = cur.fetchone()[0]
+            else:
+                author_id = author_id[0]
+            cur.execute(
+                "INSERT INTO authors_book (author_author_id, books_isbn) VALUES (%s, %s)",
+                (author_id, data["isbn"])
+            )
+        
         conn.commit()
         return jsonify({"message": "Livro adicionado com sucesso", "isbn": data["isbn"]}), 201
     except Exception as e:
