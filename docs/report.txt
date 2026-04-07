@@ -8,3 +8,18 @@ Se falhar em qualquer ponto, devolve o erro e o código do endpoint nunca chega 
 Cada ficheiro de endpoints usa um Blueprint — é a forma do Flask organizar rotas em ficheiros separados.
 
 verificar os números/códigos que vêm acompanhado das mensagens "jsonify"
+
+
+3 endpoints em librarian.py — todos com @require_role('admin', 'librarian'):
+
+Endpoint	Rota	Parâmetro
+4. List Books by Genre	GET /list_books_by_genre	genre_id
+5. Find Book by Name	GET /find_book_by_name	book_name
+6. Find Book by ISBN	GET /find_book_by_isbn	ISBN
+Decisões de implementação relevantes:
+
+_fetch_books() — função auxiliar reutilizada pelos 3 endpoints para evitar repetição da mesma query complexa. Só o WHERE muda.
+available_copies — calculado via subquery SQL (copies - COUNT(*) FROM loans WHERE return_date IS NULL), conforme exigido pelo enunciado.
+STRING_AGG(DISTINCT ...) — usado para agregar autores e géneros em SQL, evitando pós-processamento em Python. O DISTINCT garante que não há repetições se os JOINs gerarem duplicados.
+find_book_by_name — usa LIKE LOWER(%) para pesquisa parcial e case-insensitive.
+genres no response — o STRING_AGG devolve uma string "Ficção,Terror" que é depois .split(",") em Python para gerar o array [...] exigido pelo spec. O split é a única coisa feita em Python.
