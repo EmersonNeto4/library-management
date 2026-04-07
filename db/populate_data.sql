@@ -1,22 +1,24 @@
 -- =============================================
 -- Library Management System
 -- Data Management Systems Project 2025/2026
--- POPULATE DATA — Semana 2
+-- POPULATE DATA — Completo
 -- Géneros + Autores + Livros + Utilizadores
+-- + Empréstimos + Reviews
 -- =============================================
 -- ESTRUTURA:
 --   10 géneros
 --   50 autores
 --   1000 livros (100 por género)
 --      → 80 livros exclusivos por género (80%)
---      → 20 livros partilhados com o género seguinte (20%)
+--      → 20 livros partilhados com género seguinte (20%)
 --   author_books: 1 autor principal + ~33% com 2º autor
 --   1 admin + 1 librarian + 100 readers
+--   600 loans (4 históricos + 1 ativo por reader)
+--   200 reviews (2 por reader)
 -- =============================================
 
 
 -- ── 0. LIMPAR DADOS ANTERIORES ───────────────
--- Garante execução limpa mesmo que já existam dados
 TRUNCATE TABLE books_genres, author_books, reviews, loans,
               reader, librarian, admin, author, books, genres, users
 RESTART IDENTITY CASCADE;
@@ -93,10 +95,6 @@ INSERT INTO author (name) VALUES
 
 
 -- ── 3. LIVROS (1000) ─────────────────────────
--- ISBN: '978' + número de 10 dígitos com zeros à esquerda
--- Género g cobre livros (g-1)*100+1 até g*100
--- Páginas variam realisticamente por género
--- Cópias entre 1 e 10
 
 INSERT INTO books (isbn, title, description, pages, copies, registered_date)
 SELECT
@@ -155,14 +153,14 @@ FROM generate_series(1, 1000) AS s(i);
 -- Livros 1-80 de cada grupo   → exclusivos do género principal (80%)
 -- Livros 81-100 de cada grupo → também no género seguinte cíclico (20%)
 
--- 4a. Atribuição base — todos os 1000 livros ao seu género principal
+-- 4a. Atribuição base
 INSERT INTO books_genres (books_isbn, genres_genre_id)
 SELECT
     '978' || LPAD(i::text, 10, '0'),
     ceil(i::float / 100)::int
 FROM generate_series(1, 1000) AS s(i);
 
--- 4b. Atribuição secundária — livros 81-100 de cada grupo ao género seguinte
+-- 4b. Atribuição secundária
 INSERT INTO books_genres (books_isbn, genres_genre_id)
 SELECT
     '978' || LPAD(i::text, 10, '0'),
@@ -172,8 +170,6 @@ WHERE ((i - 1) % 100) >= 80;
 
 
 -- ── 5. AUTHOR_BOOKS ──────────────────────────
--- Autor principal: distribuído ciclicamente pelos 50 autores
--- ~33% dos livros têm um 2º autor diferente do 1º
 
 -- 5a. Autor principal
 INSERT INTO author_books (author_author_id, books_isbn)
@@ -182,7 +178,7 @@ SELECT
     '978' || LPAD(i::text, 10, '0')
 FROM generate_series(1, 1000) AS s(i);
 
--- 5b. Segundo autor (múltiplos de 3, garantindo que é diferente do principal)
+-- 5b. Segundo autor (~33% dos livros)
 INSERT INTO author_books (author_author_id, books_isbn)
 SELECT
     (i % 50) + 1,
@@ -210,17 +206,16 @@ VALUES (
 
 
 -- ── 7. UTILIZADORES — 100 Readers ────────────
+-- user_id: 3 a 102 (admin=1, librarian=2)
 -- username:    reader_001 a reader_100
--- email:       reader001@library.com a reader100@library.com
 -- n_estudante: 2020000001 a 2020000100
--- created_at:  datas variadas nos últimos 2 anos
 
 INSERT INTO users (username, email, password, created_at)
 SELECT
     'reader_' || LPAD(i::text, 3, '0'),
     'reader'  || LPAD(i::text, 3, '0') || '@library.com',
     'password123',
-    NOW() - (i * INTERVAL '7 days')   -- espaçados 7 dias entre si
+    NOW() - (i * INTERVAL '7 days')
 FROM generate_series(1, 100) AS s(i);
 
 INSERT INTO reader (users_user_id, n_estudante)
@@ -232,7 +227,84 @@ WHERE username LIKE 'reader_%'
 ORDER BY user_id;
 
 
--- ── 8. VERIFICAÇÃO ───────────────────────────
+-- ── 8. LOANS ─────────────────────────────────
+-- Cada reader (user_id = r+2, r de 1 a 100) tem:
+--   4 empréstimos históricos (devolvidos) → livros 1-400
+--   1 empréstimo ativo (não devolvido)    → livros 501-600
+-- Total: 500 históricos + 100 ativos = 600 loans
+--
+-- Distribuição de livros:
+--   Reader r, loan j (0..3) → livro ((r-1)*4 + j) + 1
+--   Ex: reader 1 → livros 1, 2, 3, 4
+--   Ex: reader 2 → livros 5, 6, 7, 8
+--   Cada livro 1-400 é emprestado exatamente 1 vez (histórico)
+--
+--   Ativo: reader r → livro 500 + r
+--   Ex: reader 1 → livro 501
+--   Ex: reader 100 → livro 600
+--   Cada livro 501-600 tem 1 empréstimo ativo (cópias >= 1, OK)
+--
+-- Datas:
+--   loan_date:   2023-01-01 + (r*3 + j*30) dias
+--   return_date: loan_date + 14 dias
+--   Empréstimo ativo: loan_date 2024-06-01 + r dias
+
+-- 8a. Empréstimos históricos (devolvidos)
+INSERT INTO loans (loan_date, return_date, books_isbn, users_user_id)
+SELECT
+    DATE '2023-01-01' + (r * 3 + j * 30) * INTERVAL '1 day'            AS loan_date,
+    DATE '2023-01-01' + (r * 3 + j * 30 + 14) * INTERVAL '1 day'       AS return_date,
+    '978' || LPAD(((r - 1) * 4 + j + 1)::text, 10, '0')                AS books_isbn,
+    r + 2                                                                AS users_user_id
+FROM generate_series(1, 100) AS s(r),
+     generate_series(0, 3)   AS t(j);
+
+-- 8b. Empréstimos ativos (não devolvidos)
+INSERT INTO loans (loan_date, return_date, books_isbn, users_user_id)
+SELECT
+    DATE '2024-06-01' + r * INTERVAL '1 day'    AS loan_date,
+    NULL                                         AS return_date,
+    '978' || LPAD((500 + r)::text, 10, '0')     AS books_isbn,
+    r + 2                                        AS users_user_id
+FROM generate_series(1, 100) AS s(r);
+
+
+-- ── 9. REVIEWS ───────────────────────────────
+-- Cada reader faz review dos seus 2 primeiros livros emprestados
+-- (livros que já foram devolvidos — empréstimos históricos j=0 e j=1)
+-- Garante: só se faz review de livros emprestados (regra do enunciado)
+--
+-- Reader r → reviews dos livros (r-1)*4+1 e (r-1)*4+2
+-- review_date: 7 dias após o return_date do empréstimo correspondente
+--
+-- Ratings variados mas realistas:
+--   Review 1 (k=1): rating = (r % 5) + 1       → distribui 1 a 5
+--   Review 2 (k=2): rating = ((r + 2) % 5) + 1 → desfasado 2
+
+INSERT INTO reviews (rating, comment, review_date, books_isbn, users_user_id)
+SELECT
+    CASE k
+        WHEN 1 THEN (r % 5) + 1
+        WHEN 2 THEN ((r + 2) % 5) + 1
+    END                                                                         AS rating,
+
+    CASE k
+        WHEN 1 THEN 'Really enjoyed this book. Would recommend to others. Volume ' || ((r-1)*4 + k) || '.'
+        WHEN 2 THEN 'An interesting read with great depth. Volume ' || ((r-1)*4 + k) || '.'
+    END                                                                         AS comment,
+
+    -- review_date = loan_date + 14 dias (return) + 7 dias = loan_date + 21 dias
+    DATE '2023-01-01' + (r * 3 + (k-1) * 30 + 21) * INTERVAL '1 day'         AS review_date,
+
+    '978' || LPAD(((r - 1) * 4 + k)::text, 10, '0')                           AS books_isbn,
+
+    r + 2                                                                       AS users_user_id
+
+FROM generate_series(1, 100) AS s(r),
+     generate_series(1, 2)   AS t(k);
+
+
+-- ── 10. VERIFICAÇÃO ──────────────────────────
 
 -- Verificação 1: livros por género (deve ser 100 em todos)
 SELECT
@@ -244,7 +316,7 @@ JOIN books_genres bg ON g.genre_id = bg.genres_genre_id
 GROUP BY g.genre_id, g.genre_name
 ORDER BY g.genre_id;
 
--- Verificação 2: exclusivos vs partilhados por género (exclusive_pct deve ser 80.0)
+-- Verificação 2: exclusivos vs partilhados (exclusive_pct deve ser 80.0)
 SELECT
     g.genre_id,
     g.genre_name,
@@ -286,3 +358,22 @@ UNION ALL
 SELECT 'librarian' AS tipo, COUNT(*) AS total FROM librarian
 UNION ALL
 SELECT 'reader'    AS tipo, COUNT(*) AS total FROM reader;
+
+-- Verificação 5: loans (históricos=500, ativos=100, total=600)
+SELECT
+    CASE WHEN return_date IS NULL THEN 'ativo' ELSE 'histórico' END AS tipo,
+    COUNT(*) AS total
+FROM loans
+GROUP BY (return_date IS NULL)
+ORDER BY tipo;
+
+-- Verificação 6: reviews por reader (deve ser 2 em todos)
+SELECT
+    MIN(total_reviews) AS min_reviews_por_reader,
+    MAX(total_reviews) AS max_reviews_por_reader,
+    COUNT(*)           AS total_readers_com_reviews
+FROM (
+    SELECT users_user_id, COUNT(*) AS total_reviews
+    FROM reviews
+    GROUP BY users_user_id
+) sub;
