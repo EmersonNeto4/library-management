@@ -109,7 +109,7 @@ def find_book_by_name(user_id, role):
     try:
         results = _fetch_books(
             cur,
-            "WHERE LOWER(b.title) LIKE LOWER(%s)",
+            "WHERE b.title ILIKE %s",
             (f"%{data['book_name']}%",)
         )
         if not results:
