@@ -23,3 +23,9 @@ available_copies — calculado via subquery SQL (copies - COUNT(*) FROM loans WH
 STRING_AGG(DISTINCT ...) — usado para agregar autores e géneros em SQL, evitando pós-processamento em Python. O DISTINCT garante que não há repetições se os JOINs gerarem duplicados.
 find_book_by_name — usa LIKE LOWER(%) para pesquisa parcial e case-insensitive.
 genres no response — o STRING_AGG devolve uma string "Ficção,Terror" que é depois .split(",") em Python para gerar o array [...] exigido pelo spec. O split é a única coisa feita em Python.
+
+melhoria fetch_books:
+As duas melhorias aplicadas:
+
+ARRAY_AGG → psycopg2 devolve list Python directamente, sem .split()
+LEFT JOIN loans + FILTER → uma passagem pela tabela em vez de uma subquery por cada livro
