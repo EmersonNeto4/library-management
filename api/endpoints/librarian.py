@@ -28,21 +28,19 @@ def _fetch_books(cur, where_clause, params):
         SELECT
             b.isbn,
             b.title,
-            STRING_AGG(DISTINCT a.name, ', ') AS author,
+            ARRAY_AGG(DISTINCT a.name)       AS author,
             b.pages,
             b.copies,
-            b.copies - (
-                SELECT COUNT(*)
-                FROM loans l2
-                WHERE l2.books_isbn = b.isbn
-                  AND l2.return_date IS NULL
-            ) AS available_copies,
-            STRING_AGG(DISTINCT g.genre_name, ',') AS genres
+            b.copies - COUNT(l.loan_id) FILTER (
+                WHERE l.return_date IS NULL
+            )                                AS available_copies,
+            ARRAY_AGG(DISTINCT g.genre_name) AS genres
         FROM books b
         JOIN books_genres bg ON bg.books_isbn = b.isbn
         JOIN genres       g  ON g.genre_id    = bg.genres_genre_id
         JOIN author_books ab ON ab.books_isbn  = b.isbn
         JOIN author       a  ON a.author_id    = ab.author_author_id
+        LEFT JOIN loans   l  ON l.books_isbn   = b.isbn
         {where_clause}
         GROUP BY b.isbn, b.title, b.pages, b.copies
         ORDER BY b.title
@@ -52,7 +50,7 @@ def _fetch_books(cur, where_clause, params):
     rows = cur.fetchall()
     results = []
     for row in rows:
-        isbn, title, author, pages, copies, available_copies, genres_str = row
+        isbn, title, author, pages, copies, available_copies, genres = row
         results.append({
             "ISBN": isbn,
             "book_name": title,
@@ -60,7 +58,7 @@ def _fetch_books(cur, where_clause, params):
             "pages": pages,
             "copies": copies,
             "available_copies": available_copies,
-            "genres": genres_str.split(",") if genres_str else []
+            "genres": genres if genres else []
         })
     return results
 
