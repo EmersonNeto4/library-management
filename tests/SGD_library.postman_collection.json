@@ -101,6 +101,30 @@
 			"response": []
 		},
 		{
+			"name": "7. Loaned Books",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/loaned_books",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "loaned_books"]
+				}
+			},
+			"response": []
+		},
+		{
 			"name": "4. List Books by Genre",
 			"request": {
 				"method": "GET",
