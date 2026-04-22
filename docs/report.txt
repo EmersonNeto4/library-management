@@ -49,6 +49,18 @@ ALTERAÇÕES — 2026-04-22
    - admin.py fica apenas com os endpoints 2 (POST /book) e 3 (PUT /update_copies).
 
 ─────────────────────────────────────────
+Coleção Postman criada em tests/SGD_library.postman_collection.json com os 6 endpoints
+implementados (1-6). Será expandida à medida que os restantes endpoints forem feitos.
+Segue o schema v2.1.0 do demo do professor. Credenciais passadas no body JSON.
+
+3. Autenticação — auth.py alterado para ler credenciais do body JSON
+   - Antes: lia username/password do HTTP Authorization header (Basic Auth)
+   - Agora: lê username/password do request.get_json() em todos os endpoints protegidos
+   - Motivo: o enunciado e o demo do professor passam as credenciais no body JSON;
+     os testes automáticos esperam esse formato
+   - O decorator @require_role continua a funcionar da mesma forma para os endpoints
+
+─────────────────────────────────────────
 PONTO A DISCUTIR COM PROFESSOR — 2026-04-22
 ─────────────────────────────────────────
 
