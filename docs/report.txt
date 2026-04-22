@@ -29,3 +29,21 @@ As duas melhorias aplicadas:
 
 ARRAY_AGG → psycopg2 devolve list Python directamente, sem .split()
 LEFT JOIN loans + FILTER → uma passagem pela tabela em vez de uma subquery por cada livro
+
+─────────────────────────────────────────
+ALTERAÇÕES — 2026-04-22
+─────────────────────────────────────────
+
+1. Prefixo URL e porta (app.py)
+   - Todos os blueprints registados com url_prefix='/sgdproj'
+   - Servidor arranca agora na porta 8080 (app.run port=8080)
+   - Conforme exigido pelo enunciado: http://localhost:8080/sgdproj/...
+
+2. Endpoint 1 POST /user — movido para user.py e tornado público
+   - Removido @require_role('admin'): o enunciado diz que qualquer pessoa
+     pode registar-se como reader ou librarian sem autenticação prévia.
+   - Removida a opção de criar admins por este endpoint: o enunciado diz
+     explicitamente que admins devem ser inseridos diretamente na base de dados.
+   - Endpoint movido de admin.py para user.py, que é o ficheiro adequado
+     para operações públicas (sem role obrigatório).
+   - admin.py fica apenas com os endpoints 2 (POST /book) e 3 (PUT /update_copies).
