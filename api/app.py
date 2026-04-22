@@ -11,9 +11,9 @@ from .endpoints.librarian import librarian_bp
 from .endpoints.user import user_bp
 
 #registar blueprints
-app.register_blueprint(admin_bp)
-app.register_blueprint(librarian_bp)
-app.register_blueprint(user_bp)
+app.register_blueprint(admin_bp, url_prefix='/sgdproj')
+app.register_blueprint(librarian_bp, url_prefix='/sgdproj')
+app.register_blueprint(user_bp, url_prefix='/sgdproj')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=8080)
