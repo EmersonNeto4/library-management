@@ -29,3 +29,93 @@ As duas melhorias aplicadas:
 
 ARRAY_AGG → psycopg2 devolve list Python directamente, sem .split()
 LEFT JOIN loans + FILTER → uma passagem pela tabela em vez de uma subquery por cada livro
+
+─────────────────────────────────────────
+ALTERAÇÕES — 2026-04-22
+─────────────────────────────────────────
+
+1. Prefixo URL e porta (app.py)
+   - Todos os blueprints registados com url_prefix='/sgdproj'
+   - Servidor arranca agora na porta 8080 (app.run port=8080)
+   - Conforme exigido pelo enunciado: http://localhost:8080/sgdproj/...
+
+2. Endpoint 1 POST /user — movido para user.py e tornado público
+   - Removido @require_role('admin'): o enunciado diz que qualquer pessoa
+     pode registar-se como reader ou librarian sem autenticação prévia.
+   - Removida a opção de criar admins por este endpoint: o enunciado diz
+     explicitamente que admins devem ser inseridos diretamente na base de dados.
+   - Endpoint movido de admin.py para user.py, que é o ficheiro adequado
+     para operações públicas (sem role obrigatório).
+   - admin.py fica apenas com os endpoints 2 (POST /book) e 3 (PUT /update_copies).
+
+─────────────────────────────────────────
+Coleção Postman criada em tests/SGD_library.postman_collection.json com os 6 endpoints
+implementados (1-6). Será expandida à medida que os restantes endpoints forem feitos.
+Segue o schema v2.1.0 do demo do professor. Credenciais passadas no body JSON.
+
+3. Autenticação — auth.py alterado para ler credenciais do body JSON
+   - Antes: lia username/password do HTTP Authorization header (Basic Auth)
+   - Agora: lê username/password do request.get_json() em todos os endpoints protegidos
+   - Motivo: o enunciado e o demo do professor passam as credenciais no body JSON;
+     os testes automáticos esperam esse formato
+   - O decorator @require_role continua a funcionar da mesma forma para os endpoints
+
+─────────────────────────────────────────
+ALTERAÇÕES — 2026-04-22 (endpoint 7)
+─────────────────────────────────────────
+
+7. GET /loaned_books — implementado em librarian.py
+   - Acesso: admin + librarian
+   - Devolve todos os empréstimos activos (return_date IS NULL)
+   - Cada linha é uma cópia em empréstimo (tratadas individualmente conforme enunciado)
+   - Query: JOIN loans → books → users; sem agregação, um row por empréstimo
+   - loan_date convertido para str() para serialização JSON
+   - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
+
+─────────────────────────────────────────
+ALTERAÇÕES — 2026-04-22 (fix imports)
+─────────────────────────────────────────
+
+Convertidos todos os relative imports para absolute imports em todos os ficheiros da api/:
+  - api/app.py:              from .endpoints.X  →  from endpoints.X
+  - api/auth.py:             from .db            →  from db
+  - api/endpoints/*.py:      from ..auth / ..db  →  from auth / from db
+
+Motivo: relative imports falham quando app.py é executado diretamente (python app.py).
+Só funcionam quando o módulo é importado como parte de um package (python -m).
+Solução: correr sempre a partir de dentro da pasta api/ → python app.py
+O Python adiciona a pasta corrente ao sys.path, tornando auth e db resolvíveis.
+
+─────────────────────────────────────────
+ALTERAÇÕES — 2026-04-22 (passwords na BD)
+─────────────────────────────────────────
+
+Problema detectado: populate_data.sql inseria passwords em texto simples na tabela users.
+O código em auth.py faz md5(password) antes de comparar, pelo que o login falhava
+com "credenciais inválidas" mesmo com username/password corretos.
+
+Solução aplicada directamente na BD (comando SQL no pgAdmin):
+   UPDATE users SET password = md5(password);
+
+O PostgreSQL tem a função md5() nativa que produz o mesmo hash que Python hashlib.md5().
+Após o UPDATE, todas as passwords ficam armazenadas como hash MD5 de 32 caracteres hex.
+
+Nota: novos utilizadores registados via endpoint 1 (POST /user) já ficam correctamente
+com hash MD5 porque user.py aplica hashlib.md5() antes do INSERT.
+
+─────────────────────────────────────────
+PONTO A DISCUTIR COM PROFESSOR — 2026-04-22
+─────────────────────────────────────────
+
+Autenticação: body JSON vs HTTP Authorization header
+
+O enunciado mostra as credenciais dentro do body JSON de cada pedido:
+   {"username": "admin1", "password": "pass123", "ISBN": "978..."}
+
+A implementação atual usa HTTP Basic Auth (Authorization header), lido via
+request.authorization em auth.py. O Postman enviaria as credenciais num
+header separado codificado em Base64, não no body.
+
+Se os testes automáticos do enunciado enviarem as credenciais no body,
+o mecanismo atual falha. Confirmar com o professor qual o formato esperado
+antes de alterar o decorator @require_role e todos os endpoints.
