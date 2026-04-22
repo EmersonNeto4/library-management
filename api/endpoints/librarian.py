@@ -266,3 +266,58 @@ def top_loaned_books(user_id, role, n):
     finally:
         cur.close()
         conn.close()
+
+
+# ── 10. GET /TopLoaners/<N> ───────────────────────────────────────────────────
+@librarian_bp.route('/TopLoaners/<int:n>', methods=['GET'])
+@require_role('admin', 'librarian')
+def top_loaners(user_id, role, n):
+    if n < 1:
+        return make_response(400, errors="N deve ser maior que 0")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT
+                u.user_id,
+                u.username,
+                COUNT(l.loan_id)          AS loaned_books_quantity,
+                ARRAY_AGG(DISTINCT b.title) AS loaned_books,
+                MAX(l.loan_date)           AS last_loaned_book_date,
+                (
+                    SELECT b2.title
+                    FROM loans l2
+                    JOIN books b2 ON b2.isbn = l2.books_isbn
+                    WHERE l2.users_user_id = u.user_id
+                    ORDER BY l2.loan_date DESC
+                    LIMIT 1
+                ) AS last_loaned_book
+            FROM users u
+            JOIN loans l ON l.users_user_id = u.user_id
+            JOIN books b ON b.isbn = l.books_isbn
+            GROUP BY u.user_id, u.username
+            ORDER BY loaned_books_quantity DESC
+            LIMIT %s
+            """,
+            (n,)
+        )
+        rows = cur.fetchall()
+        results = [
+            {
+                "loaner_id": row[0],
+                "loaner_name": row[1],
+                "loaned_books_quantity": row[2],
+                "loaned_books": row[3],
+                "last_loaned_book_date": str(row[4]),
+                "last_loaned_book": row[5]
+            }
+            for row in rows
+        ]
+        return make_response(200, results=results)
+    except Exception as e:
+        return make_response(500, errors=str(e))
+    finally:
+        cur.close()
+        conn.close()

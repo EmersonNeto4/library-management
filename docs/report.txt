@@ -73,6 +73,19 @@ ALTERAÇÕES — 2026-04-22 (endpoint 7)
    - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
 
 ─────────────────────────────────────────
+ALTERAÇÕES — 2026-04-22 (endpoint 10)
+─────────────────────────────────────────
+
+10. GET /TopLoaners/<N> — implementado em librarian.py
+    - Acesso: admin + librarian
+    - N passado na URL como path parameter (ex: /TopLoaners/5)
+    - loaned_books: ARRAY_AGG(DISTINCT b.title) — lista de títulos únicos emprestados
+    - last_loaned_book_date: MAX(l.loan_date) no GROUP BY
+    - last_loaned_book: subquery correlacionada (sem window functions) que ordena
+      por loan_date DESC LIMIT 1 para obter o título do último livro emprestado
+    - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
+
+─────────────────────────────────────────
 ALTERAÇÕES — 2026-04-22 (endpoint 9)
 ─────────────────────────────────────────
 

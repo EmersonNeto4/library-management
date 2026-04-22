@@ -173,6 +173,30 @@
 			"response": []
 		},
 		{
+			"name": "10. Top N Loaners",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/TopLoaners/5",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "TopLoaners", "5"]
+				}
+			},
+			"response": []
+		},
+		{
 			"name": "9. Top N Loaned Books",
 			"request": {
 				"method": "GET",
