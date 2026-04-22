@@ -47,3 +47,20 @@ ALTERAÇÕES — 2026-04-22
    - Endpoint movido de admin.py para user.py, que é o ficheiro adequado
      para operações públicas (sem role obrigatório).
    - admin.py fica apenas com os endpoints 2 (POST /book) e 3 (PUT /update_copies).
+
+─────────────────────────────────────────
+PONTO A DISCUTIR COM PROFESSOR — 2026-04-22
+─────────────────────────────────────────
+
+Autenticação: body JSON vs HTTP Authorization header
+
+O enunciado mostra as credenciais dentro do body JSON de cada pedido:
+   {"username": "admin1", "password": "pass123", "ISBN": "978..."}
+
+A implementação atual usa HTTP Basic Auth (Authorization header), lido via
+request.authorization em auth.py. O Postman enviaria as credenciais num
+header separado codificado em Base64, não no body.
+
+Se os testes automáticos do enunciado enviarem as credenciais no body,
+o mecanismo atual falha. Confirmar com o professor qual o formato esperado
+antes de alterar o decorator @require_role e todos os endpoints.
