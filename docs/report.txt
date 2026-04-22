@@ -73,6 +73,18 @@ ALTERAÇÕES — 2026-04-22 (endpoint 7)
    - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
 
 ─────────────────────────────────────────
+ALTERAÇÕES — 2026-04-22 (endpoint 8)
+─────────────────────────────────────────
+
+8. GET /loaned_book — implementado em librarian.py
+   - Acesso: admin + librarian
+   - Parâmetro: ISBN no body JSON
+   - Devolve histórico completo de empréstimos do livro (activos e devolvidos)
+   - Ordenado por loan_date DESC (mais recente primeiro), conforme enunciado
+   - Verifica se o livro existe antes de devolver resultados
+   - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
+
+─────────────────────────────────────────
 ALTERAÇÕES — 2026-04-22 (fix imports)
 ─────────────────────────────────────────
 

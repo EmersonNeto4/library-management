@@ -173,6 +173,30 @@
 			"response": []
 		},
 		{
+			"name": "8. Loaned Book (history by ISBN)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\",\n    \"ISBN\": \"9780000000001\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/loaned_book",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "loaned_book"]
+				}
+			},
+			"response": []
+		},
+		{
 			"name": "6. Find Book by ISBN",
 			"request": {
 				"method": "GET",
