@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
-from ..auth import require_role
-from ..db import get_connection
+from auth import require_role
+from db import get_connection
 
 librarian_bp = Blueprint('librarian', __name__)
 

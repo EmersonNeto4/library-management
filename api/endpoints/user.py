@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
-from ..auth import require_role
-from ..db import get_connection
+from auth import require_role
+from db import get_connection
 import hashlib
 
 user_bp = Blueprint('user', __name__)
