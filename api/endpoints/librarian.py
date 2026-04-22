@@ -147,3 +147,39 @@ def find_book_by_isbn(user_id, role):
     finally:
         cur.close()
         conn.close()
+
+
+# ── 7. GET /loaned_books ─────────────────────────────────────────────────────
+@librarian_bp.route('/loaned_books', methods=['GET'])
+@require_role('admin', 'librarian')
+def loaned_books(user_id, role):
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT b.isbn, b.title, u.user_id, u.username, l.loan_date
+            FROM loans l
+            JOIN books b ON b.isbn = l.books_isbn
+            JOIN users u ON u.user_id = l.users_user_id
+            WHERE l.return_date IS NULL
+            ORDER BY l.loan_date
+            """
+        )
+        rows = cur.fetchall()
+        results = [
+            {
+                "ISBN": row[0],
+                "book_name": row[1],
+                "loaner_id": row[2],
+                "loaner_name": row[3],
+                "loan_date": str(row[4])
+            }
+            for row in rows
+        ]
+        return make_response(200, results=results)
+    except Exception as e:
+        return make_response(500, errors=str(e))
+    finally:
+        cur.close()
+        conn.close()
