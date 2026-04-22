@@ -183,3 +183,46 @@ def loaned_books(user_id, role):
     finally:
         cur.close()
         conn.close()
+
+
+# ── 8. GET /loaned_book ───────────────────────────────────────────────────────
+@librarian_bp.route('/loaned_book', methods=['GET'])
+@require_role('admin', 'librarian')
+def loaned_book(user_id, role):
+    data = request.get_json()
+
+    if not data or "ISBN" not in data:
+        return make_response(400, errors="Campo obrigatório em falta: ISBN")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT isbn FROM books WHERE isbn = %s", (data["ISBN"],))
+        if not cur.fetchone():
+            return make_response(400, errors="Livro não encontrado")
+
+        cur.execute(
+            """
+            SELECT u.user_id, u.username, l.loan_date
+            FROM loans l
+            JOIN users u ON u.user_id = l.users_user_id
+            WHERE l.books_isbn = %s
+            ORDER BY l.loan_date DESC
+            """,
+            (data["ISBN"],)
+        )
+        rows = cur.fetchall()
+        results = [
+            {
+                "loaner_id": row[0],
+                "loaner_name": row[1],
+                "loan_date": str(row[2])
+            }
+            for row in rows
+        ]
+        return make_response(200, results=results)
+    except Exception as e:
+        return make_response(500, errors=str(e))
+    finally:
+        cur.close()
+        conn.close()
