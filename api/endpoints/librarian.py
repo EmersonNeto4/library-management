@@ -226,3 +226,43 @@ def loaned_book(user_id, role):
     finally:
         cur.close()
         conn.close()
+
+
+# ── 9. GET /TopLoanedBooks/<N> ────────────────────────────────────────────────
+@librarian_bp.route('/TopLoanedBooks/<int:n>', methods=['GET'])
+@require_role('admin', 'librarian')
+def top_loaned_books(user_id, role, n):
+    if n < 1:
+        return make_response(400, errors="N deve ser maior que 0")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT b.isbn, b.title, COUNT(l.loan_id) AS loaned_times, MAX(l.loan_date) AS last_loaned
+            FROM books b
+            JOIN loans l ON l.books_isbn = b.isbn
+            GROUP BY b.isbn, b.title
+            ORDER BY loaned_times DESC
+            LIMIT %s
+            """,
+            (n,)
+        )
+        rows = cur.fetchall()
+        results = [
+            {
+                "ISBN": row[0],
+                "book_name": row[1],
+                "loaned_times": row[2],
+                "last_loaned": str(row[3]),
+                "rank": rank
+            }
+            for rank, row in enumerate(rows, start=1)
+        ]
+        return make_response(200, results=results)
+    except Exception as e:
+        return make_response(500, errors=str(e))
+    finally:
+        cur.close()
+        conn.close()

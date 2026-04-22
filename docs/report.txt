@@ -73,6 +73,19 @@ ALTERAÇÕES — 2026-04-22 (endpoint 7)
    - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
 
 ─────────────────────────────────────────
+ALTERAÇÕES — 2026-04-22 (endpoint 9)
+─────────────────────────────────────────
+
+9. GET /TopLoanedBooks/<N> — implementado em librarian.py
+   - Acesso: admin + librarian
+   - N é passado na URL como path parameter (ex: /TopLoanedBooks/5)
+   - Flask converte automaticamente para int com <int:n>; validado > 0
+   - Query: COUNT(loan_id) por livro, MAX(loan_date) para last_loaned, LIMIT N
+   - rank calculado em Python com enumerate(rows, start=1) — os dados já chegam
+     ordenados por loaned_times DESC, o rank é apenas numeração sequencial
+   - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
+
+─────────────────────────────────────────
 ALTERAÇÕES — 2026-04-22 (endpoint 8)
 ─────────────────────────────────────────
 

@@ -173,6 +173,30 @@
 			"response": []
 		},
 		{
+			"name": "9. Top N Loaned Books",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/TopLoanedBooks/5",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "TopLoanedBooks", "5"]
+				}
+			},
+			"response": []
+		},
+		{
 			"name": "8. Loaned Book (history by ISBN)",
 			"request": {
 				"method": "GET",
