@@ -175,6 +175,47 @@ ALTERAÇÕES — 2026-04-29 (endpoint 12)
     - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
 
 ─────────────────────────────────────────
+ALTERAÇÕES — 2026-04-29 (endpoint 13)
+─────────────────────────────────────────
+
+13. POST /borrow_book — implementado em user.py
+    - Acesso: qualquer utilizador autenticado (@require_role admin, librarian, reader)
+    - Parâmetros: user_id e ISBN no body JSON (+ credenciais de auth)
+
+    CONCORRÊNCIA — Problema e Solução:
+    O problema clássico é a race condition nas cópias disponíveis: dois utilizadores
+    verificam simultaneamente que há 1 cópia livre, ambos passam na validação e ambos
+    inserem um empréstimo, resultando em available_copies = -1.
+
+    Solução implementada: SELECT FOR UPDATE (Pessimistic Locking)
+    - Ao executar "SELECT copies FROM books WHERE isbn = %s FOR UPDATE", a transação
+      adquire um lock exclusivo sobre a linha do livro.
+    - Qualquer outra transação que chegue a este ponto para o mesmo ISBN fica em
+      espera (blocked) até a primeira fazer COMMIT ou ROLLBACK.
+    - O par verificar-cópias → inserir-empréstimo torna-se efectivamente atómico.
+    - Nível de isolamento: READ COMMITTED (default do PostgreSQL) — suficiente com
+      FOR UPDATE, pois o lock garante que a contagem de empréstimos activos lê dados
+      já committed antes de avançar.
+
+    Porquê SELECT FOR UPDATE e não outras abordagens:
+    - SERIALIZABLE isolation: detecta conflitos mas aborta transações com erros que
+      exigem retry logic no cliente — mais complexo sem ganho real neste caso.
+    - Optimistic locking: adequado para baixa contenção; aqui a contenção pode ser
+      alta (mesmo livro, muitos utilizadores) e os rollbacks seriam frequentes.
+    - FOR UPDATE: explícito, previsível, sem retry, adequado para o nível do projecto.
+
+    Ordem das validações (dentro da transação):
+    1. SELECT copies FOR UPDATE → verifica existência do livro e adquire lock
+    2. COUNT active loans do livro → calcula available_copies
+    3. available_copies > 0 → sem cópias disponíveis = 400
+    4. COUNT active loans do utilizador → limite de 5 simultâneos
+    5. Verifica se utilizador já tem este livro emprestado (proactivo; a constraint
+       unique_active_loan na BD também impediria o INSERT, mas com erro genérico)
+    6. INSERT INTO loans → COMMIT
+
+    - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
+
+─────────────────────────────────────────
 PONTO A DISCUTIR COM PROFESSOR — 2026-04-29
 ─────────────────────────────────────────
 
