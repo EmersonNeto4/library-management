@@ -267,6 +267,78 @@
 				}
 			},
 			"response": []
+		},
+		{
+			"name": "11. Available Books by Genre",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"genre_id\": 1\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/available_books_by_genre",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "available_books_by_genre"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "12. Check Book Reviews",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"ISBN\": \"9780000000001\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/check_book",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "check_book"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "13. Borrow Book",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"reader1\",\n    \"password\": \"password123\",\n    \"user_id\": 1,\n    \"ISBN\": \"9780000000001\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/borrow_book",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "borrow_book"]
+				}
+			},
+			"response": []
 		}
 	]
 }

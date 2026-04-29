@@ -72,3 +72,206 @@ def register_user():
     finally:
         cur.close()
         conn.close()
+
+
+# ── 11. GET /available_books_by_genre ────────────────────────────────────────
+# Endpoint público — sem autenticação necessária.
+@user_bp.route('/available_books_by_genre', methods=['GET'])
+def available_books_by_genre():
+    data = request.get_json()
+
+    if not data or "genre_id" not in data:
+        return make_response(400, errors="Campo obrigatório em falta: genre_id")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT genre_id FROM genres WHERE genre_id = %s", (data["genre_id"],))
+        if not cur.fetchone():
+            return make_response(400, errors="Género não encontrado")
+
+        cur.execute(
+            """
+            SELECT
+                b.isbn,
+                b.title,
+                b.copies,
+                b.copies - COUNT(l.loan_id) FILTER (
+                    WHERE l.return_date IS NULL
+                )                                                        AS available_copies,
+                b.description,
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY r.rating)   AS raiting
+            FROM books b
+            JOIN books_genres bg ON bg.books_isbn       = b.isbn
+            LEFT JOIN loans   l  ON l.books_isbn        = b.isbn
+            LEFT JOIN reviews r  ON r.books_isbn        = b.isbn
+            WHERE bg.genres_genre_id = %s
+            GROUP BY b.isbn, b.title, b.copies, b.description
+            HAVING b.copies - COUNT(l.loan_id) FILTER (
+                WHERE l.return_date IS NULL
+            ) > 0
+            ORDER BY b.title
+            """,
+            (data["genre_id"],)
+        )
+        rows = cur.fetchall()
+        results = [
+            {
+                "ISBN": row[0],
+                "book_name": row[1],
+                "copies": row[2],
+                "available_copies": int(row[3]),
+                "book_description": row[4],
+                "raiting": float(row[5]) if row[5] is not None else None
+            }
+            for row in rows
+        ]
+        return make_response(200, results=results)
+    except Exception as e:
+        return make_response(500, errors=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ── 12. GET /check_book ───────────────────────────────────────────────────────
+# Endpoint público — sem autenticação necessária.
+@user_bp.route('/check_book', methods=['GET'])
+def check_book():
+    data = request.get_json()
+
+    if not data or "ISBN" not in data:
+        return make_response(400, errors="Campo obrigatório em falta: ISBN")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT b.title, AVG(r.rating) AS overall_rating
+            FROM books b
+            LEFT JOIN reviews r ON r.books_isbn = b.isbn
+            WHERE b.isbn = %s
+            GROUP BY b.title
+            """,
+            (data["ISBN"],)
+        )
+        book_row = cur.fetchone()
+        if not book_row:
+            return make_response(400, errors="Livro não encontrado")
+
+        title, overall_rating = book_row
+
+        cur.execute(
+            """
+            SELECT rating, comment
+            FROM reviews
+            WHERE books_isbn = %s
+            ORDER BY review_date DESC
+            """,
+            (data["ISBN"],)
+        )
+        reviews = [
+            {"rating": row[0], "comment": row[1]}
+            for row in cur.fetchall()
+        ]
+
+        result = {
+            "ISBN": data["ISBN"],
+            "book_name": title,
+            "overall_rating": float(overall_rating) if overall_rating is not None else None,
+            "reviews": reviews
+        }
+        return make_response(200, results=[result])
+    except Exception as e:
+        return make_response(500, errors=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ── 13. POST /borrow_book ─────────────────────────────────────────────────────
+# Qualquer utilizador autenticado pode pedir empréstimo.
+#
+# Estratégia de concorrência: SELECT FOR UPDATE
+#   Ao bloquear a linha do livro com FOR UPDATE, garantimos que apenas uma
+#   transação de cada vez pode verificar e registar um empréstimo para o mesmo
+#   livro. Qualquer outra transação concorrente fica em espera até que a
+#   primeira faça COMMIT ou ROLLBACK. Desta forma, o par "verificar cópias
+#   disponíveis → inserir empréstimo" é atómico e nunca resulta em
+#   available_copies negativo.
+@user_bp.route('/borrow_book', methods=['POST'])
+@require_role('admin', 'librarian', 'reader')
+def borrow_book(user_id, role):
+    data = request.get_json()
+
+    if not data or "user_id" not in data or "ISBN" not in data:
+        return make_response(400, errors="Campos obrigatórios em falta: user_id, ISBN")
+
+    borrower_id = data["user_id"]
+    isbn = data["ISBN"]
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        # Passo 1 — bloquear a linha do livro (FOR UPDATE).
+        # Transações concorrentes para o mesmo ISBN ficam em espera aqui até
+        # esta transação terminar, eliminando a race condition nas cópias.
+        cur.execute(
+            "SELECT copies FROM books WHERE isbn = %s FOR UPDATE",
+            (isbn,)
+        )
+        book_row = cur.fetchone()
+        if not book_row:
+            conn.rollback()
+            return make_response(400, errors="Livro não encontrado")
+
+        copies = book_row[0]
+
+        # Passo 2 — calcular cópias disponíveis depois de adquirir o lock.
+        # Lê apenas empréstimos committed (READ COMMITTED por defeito no PostgreSQL),
+        # pelo que inclui empréstimos registados por transações que já fizeram commit.
+        cur.execute(
+            "SELECT COUNT(*) FROM loans WHERE books_isbn = %s AND return_date IS NULL",
+            (isbn,)
+        )
+        active_book_loans = cur.fetchone()[0]
+        available_copies = copies - active_book_loans
+
+        if available_copies <= 0:
+            conn.rollback()
+            return make_response(400, errors="Sem cópias disponíveis para empréstimo")
+
+        # Passo 3 — verificar limite de 5 livros simultâneos por utilizador.
+        cur.execute(
+            "SELECT COUNT(*) FROM loans WHERE users_user_id = %s AND return_date IS NULL",
+            (borrower_id,)
+        )
+        if cur.fetchone()[0] >= 5:
+            conn.rollback()
+            return make_response(400, errors="Limite de 5 livros emprestados em simultâneo atingido")
+
+        # Passo 4 — verificar se o utilizador já tem este livro emprestado.
+        # A constraint unique_active_loan na BD também impede isto, mas assim
+        # devolvemos uma mensagem de erro clara em vez de um erro de constraint.
+        cur.execute(
+            "SELECT loan_id FROM loans WHERE users_user_id = %s AND books_isbn = %s AND return_date IS NULL",
+            (borrower_id, isbn)
+        )
+        if cur.fetchone():
+            conn.rollback()
+            return make_response(400, errors="Utilizador já tem este livro emprestado")
+
+        # Passo 5 — registar o empréstimo e libertar o lock.
+        cur.execute(
+            "INSERT INTO loans (books_isbn, users_user_id) VALUES (%s, %s)",
+            (isbn, borrower_id)
+        )
+        conn.commit()
+        return make_response(200, results=isbn)
+    except Exception as e:
+        conn.rollback()
+        return make_response(500, errors=str(e))
+    finally:
+        cur.close()
+        conn.close()

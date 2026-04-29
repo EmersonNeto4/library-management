@@ -142,6 +142,89 @@ Nota: novos utilizadores registados via endpoint 1 (POST /user) já ficam correc
 com hash MD5 porque user.py aplica hashlib.md5() antes do INSERT.
 
 ─────────────────────────────────────────
+ALTERAÇÕES — 2026-04-29 (endpoint 11)
+─────────────────────────────────────────
+
+11. GET /available_books_by_genre — implementado em user.py
+    - Acesso: público (sem autenticação)
+    - Parâmetro: genre_id no body JSON (integer)
+    - Devolve apenas livros com available_copies > 0 (disponíveis para empréstimo)
+    - rating calculado via PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY r.rating)
+      — ordered-set aggregate function do PostgreSQL; não é window function (sem OVER),
+      pelo que respeita as restrições do enunciado
+    - Livros sem reviews devolvem raiting: null
+    - available_copies calculado via COUNT(l.loan_id) FILTER (WHERE l.return_date IS NULL)
+      no HAVING para garantir que só entram livros disponíveis
+    - Campo "raiting" respeita o typo do enunciado propositadamente
+    - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
+
+─────────────────────────────────────────
+ALTERAÇÕES — 2026-04-29 (endpoint 12)
+─────────────────────────────────────────
+
+12. GET /check_book — implementado em user.py
+    - Acesso: público (sem autenticação)
+    - Parâmetro: ISBN no body JSON
+    - overall_rating calculado via AVG(r.rating) — o enunciado não especifica
+      mediana aqui (ao contrário do endpoint 11), pelo que se usa a média
+    - Duas queries: 1ª obtém title + overall_rating; 2ª obtém lista de reviews
+    - Livro sem reviews: overall_rating null, reviews []
+    - reviews ordenadas por review_date DESC (mais recentes primeiro)
+    - results é um array com um único objecto (o livro) conforme spec
+    - Typo "coment" do enunciado corrigido para "comment"
+    - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
+
+─────────────────────────────────────────
+ALTERAÇÕES — 2026-04-29 (endpoint 13)
+─────────────────────────────────────────
+
+13. POST /borrow_book — implementado em user.py
+    - Acesso: qualquer utilizador autenticado (@require_role admin, librarian, reader)
+    - Parâmetros: user_id e ISBN no body JSON (+ credenciais de auth)
+
+    CONCORRÊNCIA — Problema e Solução:
+    O problema clássico é a race condition nas cópias disponíveis: dois utilizadores
+    verificam simultaneamente que há 1 cópia livre, ambos passam na validação e ambos
+    inserem um empréstimo, resultando em available_copies = -1.
+
+    Solução implementada: SELECT FOR UPDATE (Pessimistic Locking)
+    - Ao executar "SELECT copies FROM books WHERE isbn = %s FOR UPDATE", a transação
+      adquire um lock exclusivo sobre a linha do livro.
+    - Qualquer outra transação que chegue a este ponto para o mesmo ISBN fica em
+      espera (blocked) até a primeira fazer COMMIT ou ROLLBACK.
+    - O par verificar-cópias → inserir-empréstimo torna-se efectivamente atómico.
+    - Nível de isolamento: READ COMMITTED (default do PostgreSQL) — suficiente com
+      FOR UPDATE, pois o lock garante que a contagem de empréstimos activos lê dados
+      já committed antes de avançar.
+
+    Porquê SELECT FOR UPDATE e não outras abordagens:
+    - SERIALIZABLE isolation: detecta conflitos mas aborta transações com erros que
+      exigem retry logic no cliente — mais complexo sem ganho real neste caso.
+    - Optimistic locking: adequado para baixa contenção; aqui a contenção pode ser
+      alta (mesmo livro, muitos utilizadores) e os rollbacks seriam frequentes.
+    - FOR UPDATE: explícito, previsível, sem retry, adequado para o nível do projecto.
+
+    Ordem das validações (dentro da transação):
+    1. SELECT copies FOR UPDATE → verifica existência do livro e adquire lock
+    2. COUNT active loans do livro → calcula available_copies
+    3. available_copies > 0 → sem cópias disponíveis = 400
+    4. COUNT active loans do utilizador → limite de 5 simultâneos
+    5. Verifica se utilizador já tem este livro emprestado (proactivo; a constraint
+       unique_active_loan na BD também impediria o INSERT, mas com erro genérico)
+    6. INSERT INTO loans → COMMIT
+
+    - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
+
+─────────────────────────────────────────
+PONTO A DISCUTIR COM PROFESSOR — 2026-04-29
+─────────────────────────────────────────
+
+Endpoint 11 — Mediana vs Média no rating
+O enunciado especifica "median". Implementado com PERCENTILE_CONT(0.5).
+Questão: a média (AVG) seria mais intuitiva e é o padrão em sistemas reais.
+Se o professor aceitar, trocar para AVG(r.rating) — mudança de uma linha.
+
+─────────────────────────────────────────
 PONTO A DISCUTIR COM PROFESSOR — 2026-04-22
 ─────────────────────────────────────────
 
