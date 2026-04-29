@@ -142,6 +142,48 @@ Nota: novos utilizadores registados via endpoint 1 (POST /user) já ficam correc
 com hash MD5 porque user.py aplica hashlib.md5() antes do INSERT.
 
 ─────────────────────────────────────────
+ALTERAÇÕES — 2026-04-29 (endpoint 11)
+─────────────────────────────────────────
+
+11. GET /available_books_by_genre — implementado em user.py
+    - Acesso: público (sem autenticação)
+    - Parâmetro: genre_id no body JSON (integer)
+    - Devolve apenas livros com available_copies > 0 (disponíveis para empréstimo)
+    - rating calculado via PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY r.rating)
+      — ordered-set aggregate function do PostgreSQL; não é window function (sem OVER),
+      pelo que respeita as restrições do enunciado
+    - Livros sem reviews devolvem raiting: null
+    - available_copies calculado via COUNT(l.loan_id) FILTER (WHERE l.return_date IS NULL)
+      no HAVING para garantir que só entram livros disponíveis
+    - Campo "raiting" respeita o typo do enunciado propositadamente
+    - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
+
+─────────────────────────────────────────
+ALTERAÇÕES — 2026-04-29 (endpoint 12)
+─────────────────────────────────────────
+
+12. GET /check_book — implementado em user.py
+    - Acesso: público (sem autenticação)
+    - Parâmetro: ISBN no body JSON
+    - overall_rating calculado via AVG(r.rating) — o enunciado não especifica
+      mediana aqui (ao contrário do endpoint 11), pelo que se usa a média
+    - Duas queries: 1ª obtém title + overall_rating; 2ª obtém lista de reviews
+    - Livro sem reviews: overall_rating null, reviews []
+    - reviews ordenadas por review_date DESC (mais recentes primeiro)
+    - results é um array com um único objecto (o livro) conforme spec
+    - Typo "coment" do enunciado corrigido para "comment"
+    - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
+
+─────────────────────────────────────────
+PONTO A DISCUTIR COM PROFESSOR — 2026-04-29
+─────────────────────────────────────────
+
+Endpoint 11 — Mediana vs Média no rating
+O enunciado especifica "median". Implementado com PERCENTILE_CONT(0.5).
+Questão: a média (AVG) seria mais intuitiva e é o padrão em sistemas reais.
+Se o professor aceitar, trocar para AVG(r.rating) — mudança de uma linha.
+
+─────────────────────────────────────────
 PONTO A DISCUTIR COM PROFESSOR — 2026-04-22
 ─────────────────────────────────────────
 
