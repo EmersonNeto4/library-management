@@ -1,242 +1,177 @@
-Definir que encriptação usar (a princípio hash MD5)
+═════════════════════════════════════════
+NOTAS DE ARQUITECTURA GERAL
+═════════════════════════════════════════
 
-Rever depois a questão das fragilidades de acesso do sistema, referente a password ou username
+Encriptação de passwords: hash MD5 (hashlib.md5 em Python; md5() no PostgreSQL).
 
-O @require_role(...) em api-auth actua como uma portagem — antes de entrar no endpoint, verifica sempre autenticação e permissões. 
-Se falhar em qualquer ponto, devolve o erro e o código do endpoint nunca chega a executar.
+@require_role(...) em auth.py actua como portagem — verifica autenticação e
+permissões antes de o código do endpoint executar. Credenciais passadas no
+body JSON (username + password), conforme exigido pelo enunciado.
 
-Cada ficheiro de endpoints usa um Blueprint — é a forma do Flask organizar rotas em ficheiros separados.
+Cada ficheiro de endpoints usa um Blueprint Flask para organizar rotas em
+ficheiros separados. Todos registados com url_prefix='/sgdproj', porta 8080.
 
-verificar os números/códigos que vêm acompanhado das mensagens "jsonify"
+Imports absolutos em todos os ficheiros da api/ — os relative imports falham
+quando app.py é executado directamente (python app.py). Solução: correr sempre
+a partir de dentro da pasta api/.
+
+Passwords na BD: o populate_data.sql inseria passwords em texto simples.
+Corrigido com: UPDATE users SET password = md5(password); no pgAdmin.
+Novos utilizadores via endpoint 1 já ficam com hash MD5 aplicado em Python.
+
+_fetch_books() em librarian.py — função auxiliar reutilizada pelos endpoints
+4, 5 e 6. Usa ARRAY_AGG(DISTINCT ...) para agregar autores e géneros em SQL,
+e LEFT JOIN loans + FILTER para calcular available_copies numa única passagem.
 
 
-3 endpoints em librarian.py — todos com @require_role('admin', 'librarian'):
-
-Endpoint	Rota	Parâmetro
-4. List Books by Genre	GET /list_books_by_genre	genre_id
-5. Find Book by Name	GET /find_book_by_name	book_name
-6. Find Book by ISBN	GET /find_book_by_isbn	ISBN
-Decisões de implementação relevantes:
-
-_fetch_books() — função auxiliar reutilizada pelos 3 endpoints para evitar repetição da mesma query complexa. Só o WHERE muda.
-available_copies — calculado via subquery SQL (copies - COUNT(*) FROM loans WHERE return_date IS NULL), conforme exigido pelo enunciado.
-STRING_AGG(DISTINCT ...) — usado para agregar autores e géneros em SQL, evitando pós-processamento em Python. O DISTINCT garante que não há repetições se os JOINs gerarem duplicados.
-find_book_by_name — usa LIKE LOWER(%) para pesquisa parcial e case-insensitive.
-genres no response — o STRING_AGG devolve uma string "Ficção,Terror" que é depois .split(",") em Python para gerar o array [...] exigido pelo spec. O split é a única coisa feita em Python.
-
-melhoria fetch_books:
-As duas melhorias aplicadas:
-
-ARRAY_AGG → psycopg2 devolve list Python directamente, sem .split()
-LEFT JOIN loans + FILTER → uma passagem pela tabela em vez de uma subquery por cada livro
+═════════════════════════════════════════
+ENDPOINTS IMPLEMENTADOS
+═════════════════════════════════════════
 
 ─────────────────────────────────────────
-ALTERAÇÕES — 2026-04-22
+1. POST /user — Registar utilizador (user.py)
 ─────────────────────────────────────────
-
-1. Prefixo URL e porta (app.py)
-   - Todos os blueprints registados com url_prefix='/sgdproj'
-   - Servidor arranca agora na porta 8080 (app.run port=8080)
-   - Conforme exigido pelo enunciado: http://localhost:8080/sgdproj/...
-
-2. Endpoint 1 POST /user — movido para user.py e tornado público
-   - Removido @require_role('admin'): o enunciado diz que qualquer pessoa
-     pode registar-se como reader ou librarian sem autenticação prévia.
-   - Removida a opção de criar admins por este endpoint: o enunciado diz
-     explicitamente que admins devem ser inseridos diretamente na base de dados.
-   - Endpoint movido de admin.py para user.py, que é o ficheiro adequado
-     para operações públicas (sem role obrigatório).
-   - admin.py fica apenas com os endpoints 2 (POST /book) e 3 (PUT /update_copies).
+- Acesso: público (sem autenticação)
+- Qualquer pessoa pode registar-se como reader ou librarian.
+- Admins são inseridos directamente na base de dados (não por este endpoint).
+- Validações: username único, email único, role válido, n_mec/n_estudante
+  conforme o role.
+- Password armazenada como hash MD5.
 
 ─────────────────────────────────────────
-Coleção Postman criada em tests/SGD_library.postman_collection.json com os 6 endpoints
-implementados (1-6). Será expandida à medida que os restantes endpoints forem feitos.
-Segue o schema v2.1.0 do demo do professor. Credenciais passadas no body JSON.
-
-3. Autenticação — auth.py alterado para ler credenciais do body JSON
-   - Antes: lia username/password do HTTP Authorization header (Basic Auth)
-   - Agora: lê username/password do request.get_json() em todos os endpoints protegidos
-   - Motivo: o enunciado e o demo do professor passam as credenciais no body JSON;
-     os testes automáticos esperam esse formato
-   - O decorator @require_role continua a funcionar da mesma forma para os endpoints
+2. POST /book — Adicionar livro (admin.py)
+─────────────────────────────────────────
+- Acesso: admin
 
 ─────────────────────────────────────────
-ALTERAÇÕES — 2026-04-22 (endpoint 7)
+3. PUT /update_copies — Modificar cópias (admin.py)
 ─────────────────────────────────────────
-
-7. GET /loaned_books — implementado em librarian.py
-   - Acesso: admin + librarian
-   - Devolve todos os empréstimos activos (return_date IS NULL)
-   - Cada linha é uma cópia em empréstimo (tratadas individualmente conforme enunciado)
-   - Query: JOIN loans → books → users; sem agregação, um row por empréstimo
-   - loan_date convertido para str() para serialização JSON
-   - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
+- Acesso: admin
 
 ─────────────────────────────────────────
-ALTERAÇÕES — 2026-04-22 (endpoint 10)
+4. GET /list_books_by_genre (librarian.py)
 ─────────────────────────────────────────
-
-10. GET /TopLoaners/<N> — implementado em librarian.py
-    - Acesso: admin + librarian
-    - N passado na URL como path parameter (ex: /TopLoaners/5)
-    - loaned_books: ARRAY_AGG(DISTINCT b.title) — lista de títulos únicos emprestados
-    - last_loaned_book_date: MAX(l.loan_date) no GROUP BY
-    - last_loaned_book: subquery correlacionada (sem window functions) que ordena
-      por loan_date DESC LIMIT 1 para obter o título do último livro emprestado
-    - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
+- Acesso: admin + librarian
+- Parâmetro: genre_name no body JSON
+- Usa _fetch_books() com WHERE por genre_id (lookup prévio pelo nome).
 
 ─────────────────────────────────────────
-ALTERAÇÕES — 2026-04-22 (endpoint 9)
+5. GET /find_book_by_name (librarian.py)
 ─────────────────────────────────────────
-
-9. GET /TopLoanedBooks/<N> — implementado em librarian.py
-   - Acesso: admin + librarian
-   - N é passado na URL como path parameter (ex: /TopLoanedBooks/5)
-   - Flask converte automaticamente para int com <int:n>; validado > 0
-   - Query: COUNT(loan_id) por livro, MAX(loan_date) para last_loaned, LIMIT N
-   - rank calculado em Python com enumerate(rows, start=1) — os dados já chegam
-     ordenados por loaned_times DESC, o rank é apenas numeração sequencial
-   - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
+- Acesso: admin + librarian
+- Parâmetro: book_name no body JSON
+- Pesquisa parcial e case-insensitive via ILIKE %book_name%.
 
 ─────────────────────────────────────────
-ALTERAÇÕES — 2026-04-22 (endpoint 8)
+6. GET /find_book_by_isbn (librarian.py)
 ─────────────────────────────────────────
-
-8. GET /loaned_book — implementado em librarian.py
-   - Acesso: admin + librarian
-   - Parâmetro: ISBN no body JSON
-   - Devolve histórico completo de empréstimos do livro (activos e devolvidos)
-   - Ordenado por loan_date DESC (mais recente primeiro), conforme enunciado
-   - Verifica se o livro existe antes de devolver resultados
-   - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
+- Acesso: admin + librarian
+- Parâmetro: ISBN no body JSON
 
 ─────────────────────────────────────────
-ALTERAÇÕES — 2026-04-22 (fix imports)
+7. GET /loaned_books (librarian.py)
 ─────────────────────────────────────────
-
-Convertidos todos os relative imports para absolute imports em todos os ficheiros da api/:
-  - api/app.py:              from .endpoints.X  →  from endpoints.X
-  - api/auth.py:             from .db            →  from db
-  - api/endpoints/*.py:      from ..auth / ..db  →  from auth / from db
-
-Motivo: relative imports falham quando app.py é executado diretamente (python app.py).
-Só funcionam quando o módulo é importado como parte de um package (python -m).
-Solução: correr sempre a partir de dentro da pasta api/ → python app.py
-O Python adiciona a pasta corrente ao sys.path, tornando auth e db resolvíveis.
+- Acesso: admin + librarian
+- Devolve todos os empréstimos activos (return_date IS NULL).
+- Cada linha é um empréstimo individual; sem agregação.
+- loan_date convertido para str() para serialização JSON.
 
 ─────────────────────────────────────────
-ALTERAÇÕES — 2026-04-22 (passwords na BD)
+8. GET /loaned_book (librarian.py)
 ─────────────────────────────────────────
-
-Problema detectado: populate_data.sql inseria passwords em texto simples na tabela users.
-O código em auth.py faz md5(password) antes de comparar, pelo que o login falhava
-com "credenciais inválidas" mesmo com username/password corretos.
-
-Solução aplicada directamente na BD (comando SQL no pgAdmin):
-   UPDATE users SET password = md5(password);
-
-O PostgreSQL tem a função md5() nativa que produz o mesmo hash que Python hashlib.md5().
-Após o UPDATE, todas as passwords ficam armazenadas como hash MD5 de 32 caracteres hex.
-
-Nota: novos utilizadores registados via endpoint 1 (POST /user) já ficam correctamente
-com hash MD5 porque user.py aplica hashlib.md5() antes do INSERT.
+- Acesso: admin + librarian
+- Parâmetro: ISBN no body JSON
+- Devolve histórico completo (activos + devolvidos) ordenado por loan_date DESC.
+- Verifica existência do livro antes de devolver resultados.
 
 ─────────────────────────────────────────
-ALTERAÇÕES — 2026-04-29 (endpoint 11)
+9. GET /TopLoanedBooks/<N> (librarian.py)
 ─────────────────────────────────────────
-
-11. GET /available_books_by_genre — implementado em user.py
-    - Acesso: público (sem autenticação)
-    - Parâmetro: genre_id no body JSON (integer)
-    - Devolve apenas livros com available_copies > 0 (disponíveis para empréstimo)
-    - rating calculado via PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY r.rating)
-      — ordered-set aggregate function do PostgreSQL; não é window function (sem OVER),
-      pelo que respeita as restrições do enunciado
-    - Livros sem reviews devolvem raiting: null
-    - available_copies calculado via COUNT(l.loan_id) FILTER (WHERE l.return_date IS NULL)
-      no HAVING para garantir que só entram livros disponíveis
-    - Campo "raiting" respeita o typo do enunciado propositadamente
-    - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
+- Acesso: admin + librarian
+- N passado na URL como path parameter (<int:n>), validado > 0.
+- Query: COUNT(loan_id) por livro, MAX(loan_date) para last_loaned, LIMIT N.
+- rank calculado em Python com enumerate(rows, start=1) — dados já chegam
+  ordenados por loaned_times DESC.
 
 ─────────────────────────────────────────
-ALTERAÇÕES — 2026-04-29 (endpoint 12)
+10. GET /TopLoaners/<N> (librarian.py)
 ─────────────────────────────────────────
-
-12. GET /check_book — implementado em user.py
-    - Acesso: público (sem autenticação)
-    - Parâmetro: ISBN no body JSON
-    - overall_rating calculado via AVG(r.rating) — o enunciado não especifica
-      mediana aqui (ao contrário do endpoint 11), pelo que se usa a média
-    - Duas queries: 1ª obtém title + overall_rating; 2ª obtém lista de reviews
-    - Livro sem reviews: overall_rating null, reviews []
-    - reviews ordenadas por review_date DESC (mais recentes primeiro)
-    - results é um array com um único objecto (o livro) conforme spec
-    - Typo "coment" do enunciado corrigido para "comment"
-    - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
+- Acesso: admin + librarian
+- N passado na URL como path parameter (<int:n>), validado > 0.
+- loaned_books: ARRAY_AGG(DISTINCT b.title).
+- last_loaned_book_date: MAX(l.loan_date).
+- last_loaned_book: subquery correlacionada (sem window functions) que ordena
+  por loan_date DESC LIMIT 1.
 
 ─────────────────────────────────────────
-ALTERAÇÕES — 2026-04-29 (endpoint 13)
+11. GET /available_books_by_genre (user.py)
 ─────────────────────────────────────────
-
-13. POST /borrow_book — implementado em user.py
-    - Acesso: qualquer utilizador autenticado (@require_role admin, librarian, reader)
-    - Parâmetros: user_id e ISBN no body JSON (+ credenciais de auth)
-
-    CONCORRÊNCIA — Problema e Solução:
-    O problema clássico é a race condition nas cópias disponíveis: dois utilizadores
-    verificam simultaneamente que há 1 cópia livre, ambos passam na validação e ambos
-    inserem um empréstimo, resultando em available_copies = -1.
-
-    Solução implementada: SELECT FOR UPDATE (Pessimistic Locking)
-    - Ao executar "SELECT copies FROM books WHERE isbn = %s FOR UPDATE", a transação
-      adquire um lock exclusivo sobre a linha do livro.
-    - Qualquer outra transação que chegue a este ponto para o mesmo ISBN fica em
-      espera (blocked) até a primeira fazer COMMIT ou ROLLBACK.
-    - O par verificar-cópias → inserir-empréstimo torna-se efectivamente atómico.
-    - Nível de isolamento: READ COMMITTED (default do PostgreSQL) — suficiente com
-      FOR UPDATE, pois o lock garante que a contagem de empréstimos activos lê dados
-      já committed antes de avançar.
-
-    Porquê SELECT FOR UPDATE e não outras abordagens:
-    - SERIALIZABLE isolation: detecta conflitos mas aborta transações com erros que
-      exigem retry logic no cliente — mais complexo sem ganho real neste caso.
-    - Optimistic locking: adequado para baixa contenção; aqui a contenção pode ser
-      alta (mesmo livro, muitos utilizadores) e os rollbacks seriam frequentes.
-    - FOR UPDATE: explícito, previsível, sem retry, adequado para o nível do projecto.
-
-    Ordem das validações (dentro da transação):
-    1. SELECT copies FOR UPDATE → verifica existência do livro e adquire lock
-    2. COUNT active loans do livro → calcula available_copies
-    3. available_copies > 0 → sem cópias disponíveis = 400
-    4. COUNT active loans do utilizador → limite de 5 simultâneos
-    5. Verifica se utilizador já tem este livro emprestado (proactivo; a constraint
-       unique_active_loan na BD também impediria o INSERT, mas com erro genérico)
-    6. INSERT INTO loans → COMMIT
-
-    - Adicionado à coleção Postman (tests/SGD_library.postman_collection.json)
+- Acesso: público (sem autenticação)
+- Parâmetro: genre_id (integer) no body JSON
+- Devolve apenas livros com available_copies > 0.
+- rating calculado via PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY r.rating)
+  — ordered-set aggregate function; não é window function (sem OVER).
+- Livros sem reviews devolvem raiting: null.
+- Campo "raiting" respeita o typo do enunciado propositadamente.
 
 ─────────────────────────────────────────
-PONTO A DISCUTIR COM PROFESSOR — 2026-04-29
+12. GET /check_book (user.py)
 ─────────────────────────────────────────
-
-Endpoint 11 — Mediana vs Média no rating
-O enunciado especifica "median". Implementado com PERCENTILE_CONT(0.5).
-Questão: a média (AVG) seria mais intuitiva e é o padrão em sistemas reais.
-Se o professor aceitar, trocar para AVG(r.rating) — mudança de uma linha.
+- Acesso: público (sem autenticação)
+- Parâmetro: ISBN no body JSON
+- overall_rating via AVG(r.rating) — o enunciado não especifica mediana aqui.
+- Duas queries: 1ª obtém title + overall_rating; 2ª obtém lista de reviews.
+- Livro sem reviews: overall_rating null, reviews [].
+- reviews ordenadas por review_date DESC.
+- results é um array com um único objecto (o livro), conforme spec.
+- Typo "coment" do enunciado corrigido para "comment".
 
 ─────────────────────────────────────────
-PONTO A DISCUTIR COM PROFESSOR — 2026-04-22
+13. POST /borrow_book (user.py)
 ─────────────────────────────────────────
+- Acesso: qualquer utilizador autenticado (@require_role admin, librarian, reader)
+- Parâmetros: user_id e ISBN no body JSON (+ credenciais de auth)
 
-Autenticação: body JSON vs HTTP Authorization header
+CONCORRÊNCIA — Problema e Solução:
+  Race condition clássica: dois utilizadores verificam simultaneamente que há
+  1 cópia livre, ambos passam na validação, ambos inserem empréstimo →
+  available_copies = -1.
 
-O enunciado mostra as credenciais dentro do body JSON de cada pedido:
-   {"username": "admin1", "password": "pass123", "ISBN": "978..."}
+  Solução: SELECT FOR UPDATE (Pessimistic Locking)
+  "SELECT copies FROM books WHERE isbn = %s FOR UPDATE" adquire um lock
+  exclusivo sobre a linha do livro. Qualquer outra transação para o mesmo ISBN
+  fica em espera até esta fazer COMMIT ou ROLLBACK. O par verificar-cópias →
+  inserir-empréstimo torna-se efectivamente atómico.
 
-A implementação atual usa HTTP Basic Auth (Authorization header), lido via
-request.authorization em auth.py. O Postman enviaria as credenciais num
-header separado codificado em Base64, não no body.
+  Nível de isolamento: READ COMMITTED (default PostgreSQL) — suficiente com
+  FOR UPDATE, pois o lock garante leitura de dados já committed.
 
-Se os testes automáticos do enunciado enviarem as credenciais no body,
-o mecanismo atual falha. Confirmar com o professor qual o formato esperado
-antes de alterar o decorator @require_role e todos os endpoints.
+  Porquê FOR UPDATE e não outras abordagens:
+  - SERIALIZABLE: aborta transações com erros que exigem retry logic no cliente.
+  - Optimistic locking: adequado para baixa contenção; aqui a contenção pode
+    ser alta (mesmo livro, muitos utilizadores).
+  - FOR UPDATE: explícito, previsível, sem retry, adequado para este projecto.
+
+  Ordem das validações (dentro da transação):
+  1. SELECT copies FOR UPDATE → verifica existência + adquire lock
+  2. COUNT active loans do livro → calcula available_copies
+  3. available_copies > 0 (senão 400)
+  4. COUNT active loans do utilizador → limite de 5 simultâneos (senão 400)
+  5. Verifica se utilizador já tem este livro (a constraint unique_active_loan
+     na BD também impediria o INSERT, mas assim damos mensagem clara)
+  6. INSERT INTO loans → COMMIT
+
+
+═════════════════════════════════════════
+PONTOS A DISCUTIR COM PROFESSOR
+═════════════════════════════════════════
+
+1. Autenticação: body JSON vs HTTP Authorization header
+   O enunciado mostra credenciais no body JSON de cada pedido.
+   Implementação actual lê username/password do request.get_json().
+   Confirmar se os testes automáticos esperam este formato.
+
+2. Endpoint 11 — Mediana vs Média no rating
+   O enunciado especifica "median" → implementado com PERCENTILE_CONT(0.5).
+   A média (AVG) seria mais intuitiva e é o padrão em sistemas reais.
+   Se aceite, trocar para AVG(r.rating) — mudança de uma linha.
