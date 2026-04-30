@@ -387,6 +387,30 @@
 				}
 			},
 			"response": []
+		},
+		{
+			"name": "16. Top N Loaned Genres (12 months)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/report/TopLoanedGenres12Months/5",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "report", "TopLoanedGenres12Months", "5"]
+				}
+			},
+			"response": []
 		}
 	]
 }

@@ -188,6 +188,16 @@ CONCORRÊNCIA — Problema e Solução:
 - Erro 400 se não existir empréstimo activo para o par (utilizador, livro).
 
 
+─────────────────────────────────────────
+16. GET /report/TopLoanedGenres12Months/<N> (librarian.py)
+─────────────────────────────────────────
+- Acesso: admin + librarian
+- N passado na URL como path parameter (<int:n>), validado > 0.
+- Filtra empréstimos dos últimos 12 meses: loan_date >= CURRENT_DATE - INTERVAL '12 months'.
+- JOIN loans → books_genres → genres; GROUP BY género; COUNT(loan_id); ORDER BY DESC; LIMIT N.
+- Devolve lista de {"genre": genre_name, "borrow_count": count}.
+
+
 ═════════════════════════════════════════
 PONTOS A DISCUTIR COM PROFESSOR
 ═════════════════════════════════════════
