@@ -275,3 +275,104 @@ def borrow_book(user_id, role):
     finally:
         cur.close()
         conn.close()
+
+
+# ── 14. POST /report/submit_review ───────────────────────────────────────────
+# Qualquer utilizador autenticado que já tenha emprestado o livro (histórico).
+# Upsert: INSERT se não existe review; UPDATE se já existe.
+@user_bp.route('/report/submit_review', methods=['POST'])
+@require_role('admin', 'librarian', 'reader')
+def submit_review(user_id, role):
+    data = request.get_json()
+
+    required = ["user_id", "ISBN", "rating", "comment"]
+    if not data or any(f not in data for f in required):
+        missing = [f for f in required if not data or f not in data]
+        return make_response(400, errors=f"Campos obrigatórios em falta: {', '.join(missing)}")
+
+    reviewer_id = data["user_id"]
+    isbn = data["ISBN"]
+    rating = data["rating"]
+    comment = data["comment"]
+
+    if not isinstance(rating, int) or not (1 <= rating <= 5):
+        return make_response(400, errors="rating deve ser um inteiro entre 1 e 5")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        # Verificar se o livro existe
+        cur.execute("SELECT isbn FROM books WHERE isbn = %s", (isbn,))
+        if not cur.fetchone():
+            return make_response(400, errors="Livro não encontrado")
+
+        # Verificar se o utilizador já emprestou este livro (histórico — não
+        # apenas empréstimos activos, pois pode ter devolvido e querer avaliar)
+        cur.execute(
+            "SELECT loan_id FROM loans WHERE users_user_id = %s AND books_isbn = %s LIMIT 1",
+            (reviewer_id, isbn)
+        )
+        if not cur.fetchone():
+            return make_response(400, errors="Utilizador não tem histórico de empréstimo para este livro")
+
+        # Upsert: INSERT se não existe; UPDATE se já existe (conflito na PK).
+        # ON CONFLICT actua sobre a PRIMARY KEY (books_isbn, users_user_id).
+        cur.execute(
+            """
+            INSERT INTO reviews (rating, comment, books_isbn, users_user_id)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (books_isbn, users_user_id)
+            DO UPDATE SET
+                rating      = EXCLUDED.rating,
+                comment     = EXCLUDED.comment,
+                review_date = NOW()
+            """,
+            (rating, comment, isbn, reviewer_id)
+        )
+        conn.commit()
+        return make_response(200, results=isbn)
+    except Exception as e:
+        conn.rollback()
+        return make_response(500, errors=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ── 15. POST /return_book ─────────────────────────────────────────────────────
+# Qualquer utilizador autenticado pode devolver um livro que tenha emprestado.
+# O registo de empréstimo é mantido na BD (return_date preenchido, não apagado).
+@user_bp.route('/return_book', methods=['POST'])
+@require_role('admin', 'librarian', 'reader')
+def return_book(user_id, role):
+    data = request.get_json()
+
+    if not data or "user_id" not in data or "ISBN" not in data:
+        return make_response(400, errors="Campos obrigatórios em falta: user_id, ISBN")
+
+    borrower_id = data["user_id"]
+    isbn = data["ISBN"]
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "SELECT loan_id FROM loans WHERE users_user_id = %s AND books_isbn = %s AND return_date IS NULL",
+            (borrower_id, isbn)
+        )
+        loan_row = cur.fetchone()
+        if not loan_row:
+            return make_response(400, errors="Empréstimo activo não encontrado para este utilizador e livro")
+
+        cur.execute(
+            "UPDATE loans SET return_date = CURRENT_DATE WHERE loan_id = %s",
+            (loan_row[0],)
+        )
+        conn.commit()
+        return make_response(200, results=borrower_id)
+    except Exception as e:
+        conn.rollback()
+        return make_response(500, errors=str(e))
+    finally:
+        cur.close()
+        conn.close()

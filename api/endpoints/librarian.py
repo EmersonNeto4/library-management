@@ -321,3 +321,39 @@ def top_loaners(user_id, role, n):
     finally:
         cur.close()
         conn.close()
+
+
+# ── 16. GET /report/TopLoanedGenres12Months/<N> ───────────────────────────────
+@librarian_bp.route('/report/TopLoanedGenres12Months/<int:n>', methods=['GET'])
+@require_role('admin', 'librarian')
+def top_loaned_genres_12_months(user_id, role, n):
+    if n < 1:
+        return make_response(400, errors="N deve ser maior que 0")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT g.genre_name, COUNT(l.loan_id) AS borrow_count
+            FROM loans l
+            JOIN books_genres bg ON bg.books_isbn      = l.books_isbn
+            JOIN genres       g  ON g.genre_id         = bg.genres_genre_id
+            WHERE l.loan_date >= CURRENT_DATE - INTERVAL '12 months'
+            GROUP BY g.genre_id, g.genre_name
+            ORDER BY borrow_count DESC
+            LIMIT %s
+            """,
+            (n,)
+        )
+        rows = cur.fetchall()
+        results = [
+            {"genre": row[0], "borrow_count": row[1]}
+            for row in rows
+        ]
+        return make_response(200, results=results)
+    except Exception as e:
+        return make_response(500, errors=str(e))
+    finally:
+        cur.close()
+        conn.close()

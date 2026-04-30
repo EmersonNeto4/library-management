@@ -162,6 +162,42 @@ CONCORRÊNCIA — Problema e Solução:
   6. INSERT INTO loans → COMMIT
 
 
+─────────────────────────────────────────
+14. POST /report/submit_review (user.py)
+─────────────────────────────────────────
+- Acesso: qualquer utilizador autenticado (@require_role admin, librarian, reader)
+- Parâmetros: user_id, ISBN, rating (1-5), comment no body JSON (+ credenciais)
+- Condição: utilizador deve ter histórico de empréstimo do livro (activo ou devolvido)
+- Lógica: upsert via INSERT ... ON CONFLICT (books_isbn, users_user_id) DO UPDATE
+  - INSERT se não existe review para este par (utilizador, livro)
+  - UPDATE (rating, comment, review_date) se já existe
+  - ON CONFLICT actua sobre a PRIMARY KEY da tabela reviews
+- rating validado em Python (1 ≤ rating ≤ 5) antes de chegar à BD
+  (a constraint chk_reviews_rating na BD também o impede, mas assim a mensagem
+  de erro é clara)
+
+
+─────────────────────────────────────────
+15. POST /return_book (user.py)
+─────────────────────────────────────────
+- Acesso: qualquer utilizador autenticado (@require_role admin, librarian, reader)
+- Parâmetros: user_id, ISBN no body JSON (+ credenciais)
+- Lógica: SELECT loan_id WHERE return_date IS NULL → UPDATE SET return_date = CURRENT_DATE
+- O registo de empréstimo não é apagado — mantido para fins de relatório/histórico.
+- Devolve user_id em caso de sucesso (conforme spec).
+- Erro 400 se não existir empréstimo activo para o par (utilizador, livro).
+
+
+─────────────────────────────────────────
+16. GET /report/TopLoanedGenres12Months/<N> (librarian.py)
+─────────────────────────────────────────
+- Acesso: admin + librarian
+- N passado na URL como path parameter (<int:n>), validado > 0.
+- Filtra empréstimos dos últimos 12 meses: loan_date >= CURRENT_DATE - INTERVAL '12 months'.
+- JOIN loans → books_genres → genres; GROUP BY género; COUNT(loan_id); ORDER BY DESC; LIMIT N.
+- Devolve lista de {"genre": genre_name, "borrow_count": count}.
+
+
 ═════════════════════════════════════════
 TRABALHO DO ELEMENTO A — BASE DE DADOS + SQL
 ═════════════════════════════════════════
