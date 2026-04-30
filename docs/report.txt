@@ -162,6 +162,21 @@ CONCORRÊNCIA — Problema e Solução:
   6. INSERT INTO loans → COMMIT
 
 
+─────────────────────────────────────────
+14. POST /report/submit_review (user.py)
+─────────────────────────────────────────
+- Acesso: qualquer utilizador autenticado (@require_role admin, librarian, reader)
+- Parâmetros: user_id, ISBN, rating (1-5), comment no body JSON (+ credenciais)
+- Condição: utilizador deve ter histórico de empréstimo do livro (activo ou devolvido)
+- Lógica: upsert via INSERT ... ON CONFLICT (books_isbn, users_user_id) DO UPDATE
+  - INSERT se não existe review para este par (utilizador, livro)
+  - UPDATE (rating, comment, review_date) se já existe
+  - ON CONFLICT actua sobre a PRIMARY KEY da tabela reviews
+- rating validado em Python (1 ≤ rating ≤ 5) antes de chegar à BD
+  (a constraint chk_reviews_rating na BD também o impede, mas assim a mensagem
+  de erro é clara)
+
+
 ═════════════════════════════════════════
 PONTOS A DISCUTIR COM PROFESSOR
 ═════════════════════════════════════════

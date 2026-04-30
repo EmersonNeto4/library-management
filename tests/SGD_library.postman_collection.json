@@ -339,6 +339,30 @@
 				}
 			},
 			"response": []
+		},
+		{
+			"name": "14. Submit Review",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"reader1\",\n    \"password\": \"password123\",\n    \"user_id\": 1,\n    \"ISBN\": \"9780000000001\",\n    \"rating\": 4,\n    \"comment\": \"Muito bom livro!\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/report/submit_review",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "report", "submit_review"]
+				}
+			},
+			"response": []
 		}
 	]
 }
