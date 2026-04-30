@@ -177,6 +177,17 @@ CONCORRÊNCIA — Problema e Solução:
   de erro é clara)
 
 
+─────────────────────────────────────────
+15. POST /return_book (user.py)
+─────────────────────────────────────────
+- Acesso: qualquer utilizador autenticado (@require_role admin, librarian, reader)
+- Parâmetros: user_id, ISBN no body JSON (+ credenciais)
+- Lógica: SELECT loan_id WHERE return_date IS NULL → UPDATE SET return_date = CURRENT_DATE
+- O registo de empréstimo não é apagado — mantido para fins de relatório/histórico.
+- Devolve user_id em caso de sucesso (conforme spec).
+- Erro 400 se não existir empréstimo activo para o par (utilizador, livro).
+
+
 ═════════════════════════════════════════
 PONTOS A DISCUTIR COM PROFESSOR
 ═════════════════════════════════════════

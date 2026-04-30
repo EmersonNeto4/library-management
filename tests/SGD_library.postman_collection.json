@@ -363,6 +363,30 @@
 				}
 			},
 			"response": []
+		},
+		{
+			"name": "15. Return Book",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"reader1\",\n    \"password\": \"password123\",\n    \"user_id\": 1,\n    \"ISBN\": \"9780000000001\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/return_book",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "return_book"]
+				}
+			},
+			"response": []
 		}
 	]
 }

@@ -337,3 +337,42 @@ def submit_review(user_id, role):
     finally:
         cur.close()
         conn.close()
+
+
+# ── 15. POST /return_book ─────────────────────────────────────────────────────
+# Qualquer utilizador autenticado pode devolver um livro que tenha emprestado.
+# O registo de empréstimo é mantido na BD (return_date preenchido, não apagado).
+@user_bp.route('/return_book', methods=['POST'])
+@require_role('admin', 'librarian', 'reader')
+def return_book(user_id, role):
+    data = request.get_json()
+
+    if not data or "user_id" not in data or "ISBN" not in data:
+        return make_response(400, errors="Campos obrigatórios em falta: user_id, ISBN")
+
+    borrower_id = data["user_id"]
+    isbn = data["ISBN"]
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "SELECT loan_id FROM loans WHERE users_user_id = %s AND books_isbn = %s AND return_date IS NULL",
+            (borrower_id, isbn)
+        )
+        loan_row = cur.fetchone()
+        if not loan_row:
+            return make_response(400, errors="Empréstimo activo não encontrado para este utilizador e livro")
+
+        cur.execute(
+            "UPDATE loans SET return_date = CURRENT_DATE WHERE loan_id = %s",
+            (loan_row[0],)
+        )
+        conn.commit()
+        return make_response(200, results=borrower_id)
+    except Exception as e:
+        conn.rollback()
+        return make_response(500, errors=str(e))
+    finally:
+        cur.close()
+        conn.close()
