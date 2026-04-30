@@ -169,3 +169,63 @@ VALUES (%(ISBN)s, %(user_id)s);
 --   utilizador já tem o livro          → 400
 --   erro inesperado (ex: violação da
 --     constraint unique_active_loan)   → 500
+
+
+-- =============================================
+-- ENDPOINT 14 — Submit Review
+-- POST /sgdproj/submit_review
+-- READER (qualquer utilizador autenticado que tenha emprestado o livro)
+-- =============================================
+-- Parâmetros: %(user_id)s, %(ISBN)s, %(rating)s, %(comment)s
+-- Cria uma review para um livro. Restrições:
+--   - O utilizador tem de ter emprestado o livro pelo menos uma vez
+--     (histórico — não precisa de ser um empréstimo activo).
+--   - Cada utilizador só pode ter uma review por livro
+--     (PK composta: books_isbn + users_user_id).
+--   - rating obrigatório entre 1 e 5 (constraint chk_reviews_rating na BD).
+--   - comment é opcional (pode ser NULL).
+
+-- Transação completa (pseudocódigo para o Elemento B):
+-- BEGIN
+--   REV.1 → se livro não existe → ROLLBACK + 400
+--   REV.2 → se utilizador nunca emprestou o livro → ROLLBACK + 400
+--   REV.3 → se já existe review → ROLLBACK + 400
+--   REV.4 → INSERT review
+-- COMMIT
+-- retornar ISBN + user_id
+
+-- REV.1 — Verificar se o livro existe
+SELECT isbn
+FROM books
+WHERE isbn = %(ISBN)s;
+-- Se não retornar resultado → 400
+
+-- REV.2 — Verificar se o utilizador já emprestou o livro (histórico)
+SELECT loan_id
+FROM loans
+WHERE users_user_id = %(user_id)s
+  AND books_isbn    = %(ISBN)s
+LIMIT 1;
+-- Se não retornar resultado → 400 (só se pode rever o que se emprestou)
+
+-- REV.3 — Verificar se já existe uma review deste utilizador para este livro
+SELECT 1
+FROM reviews
+WHERE books_isbn    = %(ISBN)s
+  AND users_user_id = %(user_id)s;
+-- Se retornar resultado → 400 (a PK também impediria o INSERT, mas assim
+--   devolvemos uma mensagem de erro clara em vez de um erro de constraint)
+
+-- REV.4 — Inserir a review
+-- review_date fica com o valor DEFAULT NOW() definido no schema
+INSERT INTO reviews (rating, comment, books_isbn, users_user_id)
+VALUES (%(rating)s, %(comment)s, %(ISBN)s, %(user_id)s);
+
+-- Erros a tratar:
+--   credenciais inválidas                   → 401
+--   user_id, ISBN ou rating em falta        → 400
+--   livro não existe                        → 400
+--   utilizador nunca emprestou o livro      → 400
+--   review já existe para este utilizador   → 400
+--   rating fora do intervalo [1, 5]         → 400
+--   erro inesperado (ex: violação da PK)    → 500

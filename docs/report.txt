@@ -251,9 +251,10 @@ Discrepância endpoint 4 (books.sql vs implementação):
   WHERE LOWER(genre_name) = LOWER(%s) (case-insensitive).
 
 ─────────────────────────────────────────
-db/queries/loans.sql — endpoints 7 a 10
+db/queries/loans.sql — endpoints 7 a 10, 15 e 16
 ─────────────────────────────────────────
 Criado em Semana 5 (30 Abr 2026, em atraso relativamente ao planeado).
+Endpoints 15 e 16 adicionados em Semana 7 (30 Abr 2026).
 
 LOAN.1 (endpoint 7) — lista todos os empréstimos activos sem agregação.
   Um registo por empréstimo; ordenado por loan_date ASC (mais antigos primeiro).
@@ -274,10 +275,23 @@ TOPL.2 (endpoint 10) — TOP N utilizadores com mais empréstimos.
   restrição do projecto; executa uma query adicional por linha do resultado
   (custo aceitável para N pequeno, e.g. top 10).
 
+RET.1/2 (endpoint 15) — devolver livro.
+  RET.1 verifica existência de empréstimo activo para o par (user_id, ISBN);
+  se não existe → 400. RET.2 faz UPDATE loans SET return_date = CURRENT_DATE
+  com RETURNING loan_id, dentro de transação. Usa CURRENT_DATE (tipo DATE) e
+  não NOW() (tipo TIMESTAMP) porque a coluna return_date é DATE no schema.
+
+TOPG.2 (endpoint 16) — TOP N géneros nos últimos 12 meses.
+  JOIN directo genres → books_genres → loans sem passar por books (mais eficiente).
+  Filtro: loan_date >= CURRENT_DATE - INTERVAL '12 months'.
+  Um livro com múltiplos géneros conta para cada género — comportamento
+  intencional que reflecte a popularidade real por género.
+
 ─────────────────────────────────────────
-db/queries/reader.sql — endpoints 11 a 13
+db/queries/reader.sql — endpoints 11 a 14
 ─────────────────────────────────────────
 Criado em Semana 6 (30 Abr 2026, em atraso relativamente ao planeado).
+Endpoint 14 adicionado em Semana 7 (30 Abr 2026).
 
 AVAIL.2 (endpoint 11) — livros disponíveis num género.
   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY r.rating) para calcular a
@@ -303,6 +317,41 @@ BORROW.1-5 (endpoint 13) — criar empréstimo com SELECT FOR UPDATE.
   A constraint unique_active_loan serve de segunda linha de defesa caso o
   passo 4 falhe (e.g., race condition antes do lock ser adquirido).
   Documentação detalhada da estratégia FOR UPDATE em report.txt, endpoint 13.
+
+REV.1-4 (endpoint 14) — submeter review.
+  Sequência de 4 verificações antes do INSERT:
+    1. REV.1 → livro existe (400 se não)
+    2. REV.2 → utilizador já emprestou o livro pelo menos uma vez, activo ou
+               devolvido (LIMIT 1 para eficiência); 400 se nunca emprestou
+    3. REV.3 → utilizador ainda não tem review para este livro; retorna erro
+               claro em vez de deixar a PK (books_isbn, users_user_id) falhar
+    4. REV.4 → INSERT INTO reviews; review_date fica com DEFAULT NOW() do schema
+  comment é opcional (pode ser NULL). Rating validado pela constraint
+  chk_reviews_rating (CHECK BETWEEN 1 AND 5) como segunda linha de defesa.
+
+─────────────────────────────────────────
+db/populate_data.sql — correcções Semana 7
+─────────────────────────────────────────
+Três problemas detectados e corrigidos em 30 Abr 2026:
+
+  Bug 1 — Contagem de empréstimos históricos errada.
+    O script gerava 400 históricos (100 readers × 4 loans) mas o cabeçalho
+    declarava 500 históricos + 100 activos = 600 total. Correcção:
+      generate_series(0, 3) → generate_series(0, 4)  (4 → 5 loans por reader)
+      Fórmula ISBN: (r-1)*4 + j + 1 → (r-1)*5 + j + 1
+    Cascata nas reviews: (r-1)*4 + k → (r-1)*5 + k (fórmula e comentários).
+    O script gera agora correctamente 500 históricos + 100 activos = 600 loans.
+
+  Bug 2 — Passwords em texto simples não hashed no script.
+    A correcção MD5 era feita manualmente no pgAdmin após cada execução.
+    Adicionada nova secção 7b ao script:
+      UPDATE users SET password = md5(password);
+    O script é agora auto-suficiente; não requer intervenção manual.
+
+  Problema 3 — Comentários contraditórios.
+    Cabeçalho dizia "4 históricos + 1 ativo" (= 500, não 600) e a secção 8
+    dizia "500 históricos" quando o código gerava apenas 400. Todos os
+    comentários actualizados para reflectir os valores correctos.
 
 
 ═════════════════════════════════════════

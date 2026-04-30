@@ -150,3 +150,74 @@ LIMIT %(n)s;
 --   user não é admin nem librarian → 403
 --   N < 1                          → 400
 --   erro inesperado                → 500
+
+
+-- =============================================
+-- ENDPOINT 15 — Return Book
+-- POST /sgdproj/return_book
+-- ADMIN, LIBRARIAN e READER (qualquer autenticado)
+-- =============================================
+-- Parâmetros: %(user_id)s, %(ISBN)s
+-- Marca o empréstimo ativo como devolvido (return_date = hoje).
+
+-- RET.1 — Verificar se existe empréstimo ativo para este utilizador e livro
+SELECT loan_id
+FROM loans
+WHERE users_user_id = %(user_id)s
+  AND books_isbn    = %(ISBN)s
+  AND return_date IS NULL;
+-- Se não retornar resultado → 400 (livro não está em posse do utilizador)
+
+-- RET.2 — Registar devolução
+UPDATE loans
+SET    return_date = CURRENT_DATE
+WHERE  users_user_id = %(user_id)s
+  AND  books_isbn    = %(ISBN)s
+  AND  return_date IS NULL
+RETURNING loan_id;
+
+-- Erros a tratar:
+--   credenciais inválidas               → 401
+--   user_id ou ISBN em falta            → 400
+--   empréstimo ativo não encontrado     → 400
+--   erro inesperado                     → 500
+
+-- Transação completa (pseudocódigo para o Elemento B):
+-- BEGIN
+--   RET.1 → se não existe empréstimo ativo → ROLLBACK + 400
+--   RET.2 → UPDATE return_date = CURRENT_DATE
+-- COMMIT
+-- retornar loan_id
+
+
+-- =============================================
+-- ENDPOINT 16 — Top Genres (últimos 12 meses)
+-- GET /sgdproj/TopGenres/<N>
+-- ADMIN e LIBRARIAN
+-- =============================================
+-- Parâmetros: N (inteiro > 0, passado no URL — não no body)
+-- Retorna os N géneros com mais empréstimos nos últimos 12 meses.
+-- NOTA: um livro com múltiplos géneros conta para cada um deles
+--       (comportamento intencional — reflecte popularidade real por género).
+
+-- TOPG.1 — Validar N (lógica no Elemento B)
+--   se N < 1 → 400
+
+-- TOPG.2 — Top N géneros mais emprestados nos últimos 12 meses
+SELECT
+    g.genre_id,
+    g.genre_name,
+    COUNT(l.loan_id) AS total_loans
+FROM genres       g
+JOIN books_genres bg ON bg.genres_genre_id = g.genre_id
+JOIN loans        l  ON l.books_isbn       = bg.books_isbn
+WHERE l.loan_date >= CURRENT_DATE - INTERVAL '12 months'
+GROUP BY g.genre_id, g.genre_name
+ORDER BY total_loans DESC
+LIMIT %(n)s;
+
+-- Erros a tratar:
+--   user não é admin nem librarian → 403
+--   N < 1                          → 400
+--   erro inesperado                → 500
+-- Resultado vazio (sem empréstimos nos últimos 12 meses) → results: []
