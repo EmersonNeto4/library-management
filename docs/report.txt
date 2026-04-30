@@ -163,6 +163,198 @@ CONCORRÊNCIA — Problema e Solução:
 
 
 ═════════════════════════════════════════
+TRABALHO DO ELEMENTO A — BASE DE DADOS + SQL
+═════════════════════════════════════════
+
+─────────────────────────────────────────
+db/create_tables.sql
+─────────────────────────────────────────
+Script de criação completa da base de dados library_db (DROP + CREATE + tabelas
++ constraints). Corre como superuser; usa \c library_db para mudar de contexto
+(só funciona em psql — no pgAdmin executar em duas fases).
+
+Tabelas criadas:
+  users, books, genres, loans, reviews,
+  admin, librarian, reader (herança via FK de users),
+  author, author_books, books_genres
+
+Constraints notáveis:
+
+  unique_active_loan — índice único parcial em loans(users_user_id, books_isbn)
+  WHERE return_date IS NULL. Garante que o mesmo utilizador não pode ter o mesmo
+  livro emprestado duas vezes em simultâneo. Implementado como índice parcial
+  porque CHECK(UNIQUE ...) não é suportado em PostgreSQL para condições
+  parciais; um índice parcial tem exactamente o mesmo efeito com custo mínimo.
+
+  chk_reviews_rating — CHECK (rating BETWEEN 1 AND 5).
+  chk_books_pages    — CHECK (pages > 0).
+  chk_books_copies   — CHECK (copies >= 0).
+  unique_username, unique_email — em users.
+  unique_genre_name  — em genres.
+
+─────────────────────────────────────────
+db/populate_data.sql
+─────────────────────────────────────────
+Dados sintéticos para testes e demonstração:
+
+  - 10 géneros
+  - 50 autores
+  - 1000 livros (100 por género)
+      * 80 % exclusivos do género
+      * 20 % partilhados com o género seguinte (ciclo modular)
+      * ~33 % com 2 autores
+  - 1 admin   (admin1     / password123)
+  - 1 librarian (librarian1 / password123)
+  - 100 readers (reader_001 a reader_100 / password123)
+  - 600 empréstimos (500 históricos devolvidos + 100 ativos)
+  - 200 reviews (2 por reader, apenas de livros já emprestados)
+
+Correcção aplicada pós-inserção: as passwords foram inseridas em texto simples;
+corrigidas com UPDATE users SET password = md5(password) no pgAdmin, para
+ficarem consistentes com o hash MD5 que o endpoint 1 aplica em Python.
+
+─────────────────────────────────────────
+db/queries/books.sql — endpoints 1 a 6
+─────────────────────────────────────────
+Cobre autenticação (AUTH.1) e os primeiros seis endpoints.
+
+AUTH.1 — query única que devolve user_id + user_type via CASE/LEFT JOINs nas
+tabelas admin, librarian, reader. A implementação em auth.py opta por três
+queries separadas (check user → check admin → check librarian), funcionalmente
+equivalente mas diferente da query de referência.
+
+Padrão dos endpoints 4, 5, 6 (List/Find books):
+  SELECT b.isbn, b.title,
+         ARRAY_AGG(DISTINCT a.name)       AS author,
+         b.pages, b.copies,
+         b.copies - COUNT(l.loan_id) FILTER (WHERE l.return_date IS NULL)
+                                          AS available_copies,
+         ARRAY_AGG(DISTINCT g.genre_name) AS genres
+  FROM books b
+  JOIN books_genres / genres / author_books / author
+  LEFT JOIN loans l ON l.books_isbn = b.isbn
+  WHERE <condição>
+  GROUP BY b.isbn, b.title, b.pages, b.copies
+  ORDER BY b.title;
+
+  ARRAY_AGG(DISTINCT ...) — necessário para evitar duplicados quando um livro
+  tem mais do que um autor ou mais do que um género; os JOINs geram produto
+  cartesiano entre autores e géneros.
+
+  available_copies em linha única — subtrai contagem de empréstimos ativos
+  directamente no SELECT sem subquery, usando FILTER para contar apenas
+  linhas com return_date IS NULL.
+
+Discrepância endpoint 4 (books.sql vs implementação):
+  books.sql usa %(genre_id)s; a implementação em librarian.py aceita
+  genre_name no body e faz lookup do genre_id internamente com
+  WHERE LOWER(genre_name) = LOWER(%s) (case-insensitive).
+
+─────────────────────────────────────────
+db/queries/loans.sql — endpoints 7 a 10, 15 e 16
+─────────────────────────────────────────
+Criado em Semana 5 (30 Abr 2026, em atraso relativamente ao planeado).
+Endpoints 15 e 16 adicionados em Semana 7 (30 Abr 2026).
+
+LOAN.1 (endpoint 7) — lista todos os empréstimos activos sem agregação.
+  Um registo por empréstimo; ordenado por loan_date ASC (mais antigos primeiro).
+
+LHIST.1/2 (endpoint 8) — verifica existência do livro (400 se não existe),
+  depois devolve histórico completo (ativos + devolvidos) por loan_date DESC.
+
+TOPB.2 (endpoint 9) — TOP N livros mais emprestados.
+  COUNT(l.loan_id) sem DISTINCT é seguro aqui porque o JOIN é books ↔ loans
+  sem outras tabelas que gerem produto cartesiano.
+  MAX(l.loan_date) devolve data do último empréstimo.
+  O campo rank NÃO é calculado em SQL — é gerado em Python com
+  enumerate(rows, start=1); os dados chegam já ordenados por loaned_times DESC.
+
+TOPL.2 (endpoint 10) — TOP N utilizadores com mais empréstimos.
+  Subquery correlacionada para last_loaned_book: ordena loans do utilizador por
+  loan_date DESC LIMIT 1. Evita window functions (RANK/ROW_NUMBER) conforme
+  restrição do projecto; executa uma query adicional por linha do resultado
+  (custo aceitável para N pequeno, e.g. top 10).
+
+RET.1/2 (endpoint 15) — devolver livro.
+  RET.1 verifica existência de empréstimo activo para o par (user_id, ISBN);
+  se não existe → 400. RET.2 faz UPDATE loans SET return_date = CURRENT_DATE
+  com RETURNING loan_id, dentro de transação. Usa CURRENT_DATE (tipo DATE) e
+  não NOW() (tipo TIMESTAMP) porque a coluna return_date é DATE no schema.
+
+TOPG.2 (endpoint 16) — TOP N géneros nos últimos 12 meses.
+  JOIN directo genres → books_genres → loans sem passar por books (mais eficiente).
+  Filtro: loan_date >= CURRENT_DATE - INTERVAL '12 months'.
+  Um livro com múltiplos géneros conta para cada género — comportamento
+  intencional que reflecte a popularidade real por género.
+
+─────────────────────────────────────────
+db/queries/reader.sql — endpoints 11 a 14
+─────────────────────────────────────────
+Criado em Semana 6 (30 Abr 2026, em atraso relativamente ao planeado).
+Endpoint 14 adicionado em Semana 7 (30 Abr 2026).
+
+AVAIL.2 (endpoint 11) — livros disponíveis num género.
+  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY r.rating) para calcular a
+  mediana do rating. É uma ordered-set aggregate function, não uma window
+  function (não usa OVER) — não viola a restrição do projecto.
+  HAVING garante que só retorna livros com available_copies > 0.
+  Livros sem reviews devolvem raiting: null (LEFT JOIN + PERCENTILE_CONT).
+  Campo mantém o typo "raiting" conforme o enunciado.
+
+CHECK.1/2 (endpoint 12) — informação do livro + reviews.
+  Duas queries separadas: a primeira obtém title + AVG(rating); a segunda
+  obtém a lista de reviews ordenada por review_date DESC.
+  AVG em vez de PERCENTILE_CONT porque o enunciado não especifica mediana
+  para este endpoint (diferente do endpoint 11).
+
+BORROW.1-5 (endpoint 13) — criar empréstimo com SELECT FOR UPDATE.
+  Sequência de 5 passos dentro de uma transação:
+    1. SELECT copies ... FOR UPDATE  → bloqueia a linha do livro
+    2. COUNT active loans do livro   → calcula available_copies
+    3. COUNT active loans do user    → verifica limite de 5 simultâneos
+    4. SELECT loan duplicado         → evita mensagem de erro obscura da BD
+    5. INSERT INTO loans             → regista o empréstimo
+  A constraint unique_active_loan serve de segunda linha de defesa caso o
+  passo 4 falhe (e.g., race condition antes do lock ser adquirido).
+  Documentação detalhada da estratégia FOR UPDATE em report.txt, endpoint 13.
+
+REV.1-4 (endpoint 14) — submeter review.
+  Sequência de 4 verificações antes do INSERT:
+    1. REV.1 → livro existe (400 se não)
+    2. REV.2 → utilizador já emprestou o livro pelo menos uma vez, activo ou
+               devolvido (LIMIT 1 para eficiência); 400 se nunca emprestou
+    3. REV.3 → utilizador ainda não tem review para este livro; retorna erro
+               claro em vez de deixar a PK (books_isbn, users_user_id) falhar
+    4. REV.4 → INSERT INTO reviews; review_date fica com DEFAULT NOW() do schema
+  comment é opcional (pode ser NULL). Rating validado pela constraint
+  chk_reviews_rating (CHECK BETWEEN 1 AND 5) como segunda linha de defesa.
+
+─────────────────────────────────────────
+db/populate_data.sql — correcções Semana 7
+─────────────────────────────────────────
+Três problemas detectados e corrigidos em 30 Abr 2026:
+
+  Bug 1 — Contagem de empréstimos históricos errada.
+    O script gerava 400 históricos (100 readers × 4 loans) mas o cabeçalho
+    declarava 500 históricos + 100 activos = 600 total. Correcção:
+      generate_series(0, 3) → generate_series(0, 4)  (4 → 5 loans por reader)
+      Fórmula ISBN: (r-1)*4 + j + 1 → (r-1)*5 + j + 1
+    Cascata nas reviews: (r-1)*4 + k → (r-1)*5 + k (fórmula e comentários).
+    O script gera agora correctamente 500 históricos + 100 activos = 600 loans.
+
+  Bug 2 — Passwords em texto simples não hashed no script.
+    A correcção MD5 era feita manualmente no pgAdmin após cada execução.
+    Adicionada nova secção 7b ao script:
+      UPDATE users SET password = md5(password);
+    O script é agora auto-suficiente; não requer intervenção manual.
+
+  Problema 3 — Comentários contraditórios.
+    Cabeçalho dizia "4 históricos + 1 ativo" (= 500, não 600) e a secção 8
+    dizia "500 históricos" quando o código gerava apenas 400. Todos os
+    comentários actualizados para reflectir os valores correctos.
+
+
+═════════════════════════════════════════
 PONTOS A DISCUTIR COM PROFESSOR
 ═════════════════════════════════════════
 

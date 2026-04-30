@@ -13,7 +13,7 @@
 --      → 20 livros partilhados com género seguinte (20%)
 --   author_books: 1 autor principal + ~33% com 2º autor
 --   1 admin + 1 librarian + 100 readers
---   600 loans (4 históricos + 1 ativo por reader)
+--   600 loans (5 históricos + 1 ativo por reader)
 --   200 reviews (2 por reader)
 -- =============================================
 
@@ -227,17 +227,25 @@ WHERE username LIKE 'reader_%'
 ORDER BY user_id;
 
 
+-- ── 7b. HASH DAS PASSWORDS ───────────────────
+-- As passwords foram inseridas em texto simples para facilitar a leitura.
+-- Esta instrução aplica o hash MD5 a todos os utilizadores de uma vez,
+-- ficando consistente com o que o endpoint 1 faz em Python (hashlib.md5).
+
+UPDATE users SET password = md5(password);
+
+
 -- ── 8. LOANS ─────────────────────────────────
 -- Cada reader (user_id = r+2, r de 1 a 100) tem:
---   4 empréstimos históricos (devolvidos) → livros 1-400
+--   5 empréstimos históricos (devolvidos) → livros 1-500
 --   1 empréstimo ativo (não devolvido)    → livros 501-600
 -- Total: 500 históricos + 100 ativos = 600 loans
 --
 -- Distribuição de livros:
---   Reader r, loan j (0..3) → livro ((r-1)*4 + j) + 1
---   Ex: reader 1 → livros 1, 2, 3, 4
---   Ex: reader 2 → livros 5, 6, 7, 8
---   Cada livro 1-400 é emprestado exatamente 1 vez (histórico)
+--   Reader r, loan j (0..4) → livro ((r-1)*5 + j) + 1
+--   Ex: reader 1 → livros 1, 2, 3, 4, 5
+--   Ex: reader 2 → livros 6, 7, 8, 9, 10
+--   Cada livro 1-500 é emprestado exatamente 1 vez (histórico)
 --
 --   Ativo: reader r → livro 500 + r
 --   Ex: reader 1 → livro 501
@@ -254,10 +262,10 @@ INSERT INTO loans (loan_date, return_date, books_isbn, users_user_id)
 SELECT
     DATE '2023-01-01' + (r * 3 + j * 30) * INTERVAL '1 day'            AS loan_date,
     DATE '2023-01-01' + (r * 3 + j * 30 + 14) * INTERVAL '1 day'       AS return_date,
-    '978' || LPAD(((r - 1) * 4 + j + 1)::text, 10, '0')                AS books_isbn,
+    '978' || LPAD(((r - 1) * 5 + j + 1)::text, 10, '0')                AS books_isbn,
     r + 2                                                                AS users_user_id
 FROM generate_series(1, 100) AS s(r),
-     generate_series(0, 3)   AS t(j);
+     generate_series(0, 4)   AS t(j);
 
 -- 8b. Empréstimos ativos (não devolvidos)
 INSERT INTO loans (loan_date, return_date, books_isbn, users_user_id)
@@ -274,7 +282,7 @@ FROM generate_series(1, 100) AS s(r);
 -- (livros que já foram devolvidos — empréstimos históricos j=0 e j=1)
 -- Garante: só se faz review de livros emprestados (regra do enunciado)
 --
--- Reader r → reviews dos livros (r-1)*4+1 e (r-1)*4+2
+-- Reader r → reviews dos livros (r-1)*5+1 e (r-1)*5+2
 -- review_date: 7 dias após o return_date do empréstimo correspondente
 --
 -- Ratings variados mas realistas:
@@ -289,14 +297,14 @@ SELECT
     END                                                                         AS rating,
 
     CASE k
-        WHEN 1 THEN 'Really enjoyed this book. Would recommend to others. Volume ' || ((r-1)*4 + k) || '.'
-        WHEN 2 THEN 'An interesting read with great depth. Volume ' || ((r-1)*4 + k) || '.'
+        WHEN 1 THEN 'Really enjoyed this book. Would recommend to others. Volume ' || ((r-1)*5 + k) || '.'
+        WHEN 2 THEN 'An interesting read with great depth. Volume ' || ((r-1)*5 + k) || '.'
     END                                                                         AS comment,
 
     -- review_date = loan_date + 14 dias (return) + 7 dias = loan_date + 21 dias
     DATE '2023-01-01' + (r * 3 + (k-1) * 30 + 21) * INTERVAL '1 day'         AS review_date,
 
-    '978' || LPAD(((r - 1) * 4 + k)::text, 10, '0')                           AS books_isbn,
+    '978' || LPAD(((r - 1) * 5 + k)::text, 10, '0')                           AS books_isbn,
 
     r + 2                                                                       AS users_user_id
 
