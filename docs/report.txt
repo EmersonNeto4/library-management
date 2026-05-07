@@ -4,9 +4,41 @@ NOTAS DE ARQUITECTURA GERAL
 
 Encriptação de passwords: hash MD5 (hashlib.md5 em Python; md5() no PostgreSQL).
 
-@require_role(...) em auth.py actua como portagem — verifica autenticação e
-permissões antes de o código do endpoint executar. Credenciais passadas no
-body JSON (username + password), conforme exigido pelo enunciado.
+@require_role(...) em auth.py — decorator de fábrica com três camadas:
+
+  Camada 1 — require_role('admin', 'librarian')
+    Chamado com os roles permitidos como argumentos; devolve o decorator
+    capturando os roles em closure.
+
+  Camada 2 — decorator(f)
+    Recebe a função do endpoint como f e devolve o wrapper que a substitui.
+    @functools.wraps(f) garante que o Flask vê o nome original da função
+    (necessário para o sistema de rotas não colidir).
+
+  Camada 3 — wrapper(*args, **kwargs) — corre em cada pedido HTTP:
+    1. Lê username e password do body JSON; 401 se em falta.
+    2. check_auth(): hash MD5 da password, SELECT na BD, verifica se bate.
+       Depois consulta admin, librarian em cascata — se não estiver em
+       nenhuma, role = 'reader'.
+    3. Verifica se o role do utilizador está na lista de roles permitidos;
+       403 se não estiver.
+    4. Chama a função original injectando user_id e role como keyword
+       arguments: f(*args, user_id=user_id, role=role, **kwargs).
+
+  Por isso a assinatura de cada endpoint protegido inclui user_id e role —
+  não são parâmetros de rota Flask; são injectados pelo decorator.
+  Parâmetros de URL (e.g. n em /TopLoaners/<int:n>) chegam via Flask
+  separadamente em kwargs.
+
+  Fluxo resumido:
+    Pedido HTTP
+        │
+        ▼
+    wrapper()
+        ├─ body tem username+password? → não → 401
+        ├─ check_auth() → credenciais válidas? → não → 401
+        ├─ role está na lista? → não → 403
+        └─ sim → chama endpoint(user_id=..., role=..., n=...)
 
 Cada ficheiro de endpoints usa um Blueprint Flask para organizar rotas em
 ficheiros separados. Todos registados com url_prefix='/sgdproj', porta 8080.
