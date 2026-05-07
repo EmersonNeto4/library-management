@@ -19,7 +19,7 @@ def make_response(status, results=None, errors=None):
 def add_book(user_id, role):
     data = request.get_json()
 
-    required = ["isbn", "book_name", "author", "description", "pages", "copies", "genres"]
+    required = ["ISBN", "book_name", "author", "book_description", "pages", "copies", "genres"]
     for field in required:
         if field not in data:
             return make_response(400, errors=f"Campo obrigatório em falta: {field}")
@@ -36,7 +36,7 @@ def add_book(user_id, role):
     conn = get_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT isbn FROM books WHERE isbn = %s", (data["isbn"],))
+        cur.execute("SELECT isbn FROM books WHERE isbn = %s", (data["ISBN"],))
         if cur.fetchone():
             return make_response(400, errors="Livro com este ISBN já existe")
 
@@ -45,7 +45,7 @@ def add_book(user_id, role):
             INSERT INTO books (isbn, title, description, pages, copies)
             VALUES (%s, %s, %s, %s, %s)
             """,
-            (data["isbn"], data["book_name"], data["description"],
+            (data["ISBN"], data["book_name"], data["book_description"],
              data["pages"], data["copies"])
         )
 
@@ -58,7 +58,7 @@ def add_book(user_id, role):
                 return make_response(400, errors=f"Género não encontrado: {genre}")
             cur.execute(
                 "INSERT INTO books_genres (books_isbn, genres_genre_id) VALUES (%s, %s)",
-                (data["isbn"], row[0])
+                (data["ISBN"], row[0])
             )
 
         # Autores (string separada por vírgula)
@@ -76,11 +76,11 @@ def add_book(user_id, role):
                 author_id = cur.fetchone()[0]
             cur.execute(
                 "INSERT INTO author_books (author_author_id, books_isbn) VALUES (%s, %s)",
-                (author_id, data["isbn"])
+                (author_id, data["ISBN"])
             )
 
         conn.commit()
-        return make_response(200, results=data["isbn"])
+        return make_response(200, results=data["ISBN"])
     except Exception as e:
         conn.rollback()
         return make_response(500, errors=str(e))
@@ -95,7 +95,7 @@ def add_book(user_id, role):
 def update_copies(user_id, role):
     data = request.get_json()
 
-    required = ["isbn", "copies"]
+    required = ["ISBN", "copies"]
     for field in required:
         if field not in data:
             return make_response(400, errors=f"Campo obrigatório em falta: {field}")
@@ -106,7 +106,7 @@ def update_copies(user_id, role):
     conn = get_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT copies FROM books WHERE isbn = %s", (data["isbn"],))
+        cur.execute("SELECT copies FROM books WHERE isbn = %s", (data["ISBN"],))
         book = cur.fetchone()
         if not book:
             return make_response(400, errors="Livro não encontrado")
@@ -117,7 +117,7 @@ def update_copies(user_id, role):
             SELECT COUNT(*) FROM loans
             WHERE books_isbn = %s AND return_date IS NULL
             """,
-            (data["isbn"],)
+            (data["ISBN"],)
         )
         on_loan = cur.fetchone()[0]
 
@@ -129,10 +129,10 @@ def update_copies(user_id, role):
 
         cur.execute(
             "UPDATE books SET copies = %s WHERE isbn = %s",
-            (data["copies"], data["isbn"])
+            (data["copies"], data["ISBN"])
         )
         conn.commit()
-        return make_response(200, results=data["isbn"])
+        return make_response(200, results=data["ISBN"])
     except Exception as e:
         conn.rollback()
         return make_response(500, errors=str(e))
