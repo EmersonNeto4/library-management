@@ -69,23 +69,20 @@ def _fetch_books(cur, where_clause, params):
 def list_books_by_genre(user_id, role):
     data = request.get_json()
 
-    if not data or "genre_name" not in data:
-        return make_response(400, errors="Campo obrigatório em falta: genre_name")
+    if not data or "genre_id" not in data:
+        return make_response(400, errors="Campo obrigatório em falta: genre_id")
 
     conn = get_connection()
     cur = conn.cursor()
     try:
-        # Verificar se o género existe e obter o seu ID
-        cur.execute("SELECT genre_id FROM genres WHERE LOWER(genre_name) = LOWER(%s)", (data["genre_name"],))
-        row = cur.fetchone()
-        if not row:
+        cur.execute("SELECT genre_id FROM genres WHERE genre_id = %s", (data["genre_id"],))
+        if not cur.fetchone():
             return make_response(400, errors="Género não encontrado")
-        genre_id = row[0]
 
         results = _fetch_books(
             cur,
             "WHERE b.isbn IN (SELECT books_isbn FROM books_genres WHERE genres_genre_id = %s)",
-            (genre_id,)
+            (data["genre_id"],)
         )
         return make_response(200, results=results)
     except Exception as e:

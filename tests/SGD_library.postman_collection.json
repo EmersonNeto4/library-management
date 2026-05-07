@@ -59,7 +59,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\",\n    \"isbn\": \"978-TEST-001\",\n    \"book_name\": \"Livro de Teste\",\n    \"author\": \"Autor Teste\",\n    \"description\": \"Descrição do livro de teste.\",\n    \"pages\": 300,\n    \"copies\": 5,\n    \"genres\": [\"Fiction\"]\n}",
+					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\",\n    \"ISBN\": \"978-TEST-001\",\n    \"book_name\": \"Livro de Teste\",\n    \"author\": \"Autor Teste\",\n    \"book_description\": \"Descrição do livro de teste.\",\n    \"pages\": 300,\n    \"copies\": 5,\n    \"genres\": [\"Fiction\"]\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -83,7 +83,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\",\n    \"isbn\": \"978-TEST-001\",\n    \"copies\": 10\n}",
+					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\",\n    \"ISBN\": \"978-TEST-001\",\n    \"copies\": 10\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -107,7 +107,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\",\n    \"genre_name\": \"Fiction\"\n}",
+					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\",\n    \"genre_id\": 1\n}",
 					"options": {
 						"raw": {
 							"language": "json"
