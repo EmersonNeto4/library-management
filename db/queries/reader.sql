@@ -189,10 +189,9 @@ VALUES (%(ISBN)s, %(user_id)s);
 -- BEGIN
 --   REV.1 → se livro não existe → ROLLBACK + 400
 --   REV.2 → se utilizador nunca emprestou o livro → ROLLBACK + 400
---   REV.3 → se já existe review → ROLLBACK + 400
---   REV.4 → INSERT review
+--   REV.3 → UPSERT: INSERT ou UPDATE (ON CONFLICT)
 -- COMMIT
--- retornar ISBN + user_id
+-- retornar ISBN
 
 -- REV.1 — Verificar se o livro existe
 SELECT isbn
@@ -208,24 +207,22 @@ WHERE users_user_id = %(user_id)s
 LIMIT 1;
 -- Se não retornar resultado → 400 (só se pode rever o que se emprestou)
 
--- REV.3 — Verificar se já existe uma review deste utilizador para este livro
-SELECT 1
-FROM reviews
-WHERE books_isbn    = %(ISBN)s
-  AND users_user_id = %(user_id)s;
--- Se retornar resultado → 400 (a PK também impediria o INSERT, mas assim
---   devolvemos uma mensagem de erro clara em vez de um erro de constraint)
-
--- REV.4 — Inserir a review
--- review_date fica com o valor DEFAULT NOW() definido no schema
+-- REV.3 — Upsert da review (INSERT se não existe; UPDATE se já existe)
+-- ON CONFLICT actua sobre a PRIMARY KEY (books_isbn, users_user_id).
+-- Se o utilizador já tem uma review para este livro, atualiza rating,
+-- comment e review_date em vez de rejeitar o pedido.
 INSERT INTO reviews (rating, comment, books_isbn, users_user_id)
-VALUES (%(rating)s, %(comment)s, %(ISBN)s, %(user_id)s);
+VALUES (%(rating)s, %(comment)s, %(ISBN)s, %(user_id)s)
+ON CONFLICT (books_isbn, users_user_id)
+DO UPDATE SET
+    rating      = EXCLUDED.rating,
+    comment     = EXCLUDED.comment,
+    review_date = NOW();
 
 -- Erros a tratar:
 --   credenciais inválidas                   → 401
---   user_id, ISBN ou rating em falta        → 400
+--   user_id, ISBN, rating ou comment em falta → 400
 --   livro não existe                        → 400
 --   utilizador nunca emprestou o livro      → 400
---   review já existe para este utilizador   → 400
 --   rating fora do intervalo [1, 5]         → 400
---   erro inesperado (ex: violação da PK)    → 500
+--   erro inesperado                         → 500
