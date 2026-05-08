@@ -24,7 +24,7 @@
 -- =============================================
 -- Parâmetros: %(genre_id)s
 -- Lista livros com cópias disponíveis (available_copies > 0)
--- num dado género. Rating = mediana das avaliações (PERCENTILE_CONT).
+-- num dado género. Rating = média das avaliações (AVG).
 
 -- AVAIL.1 — Verificar se o género existe
 SELECT genre_id
@@ -41,7 +41,7 @@ SELECT
         WHERE l.return_date IS NULL
     )                                                            AS available_copies,
     b.description                                                AS book_description,
-    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY r.rating)       AS raiting
+    AVG(r.rating)                                                AS raiting
 FROM books         b
 JOIN books_genres  bg ON bg.books_isbn  = b.isbn
 LEFT JOIN loans    l  ON l.books_isbn   = b.isbn

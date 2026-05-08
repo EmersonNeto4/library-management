@@ -100,7 +100,7 @@ def available_books_by_genre():
                     WHERE l.return_date IS NULL
                 )                                                        AS available_copies,
                 b.description,
-                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY r.rating)   AS raiting
+                AVG(r.rating)                                            AS raiting
             FROM books b
             JOIN books_genres bg ON bg.books_isbn       = b.isbn
             LEFT JOIN loans   l  ON l.books_isbn        = b.isbn
