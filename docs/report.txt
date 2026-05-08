@@ -141,8 +141,8 @@ ENDPOINTS IMPLEMENTADOS
 - Acesso: público (sem autenticação)
 - Parâmetro: genre_id (integer) no body JSON
 - Devolve apenas livros com available_copies > 0.
-- rating calculado via PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY r.rating)
-  — ordered-set aggregate function; não é window function (sem OVER).
+- rating calculado via AVG(r.rating) — confirmado com o professor (média em
+  vez de mediana é aceite e mais adequado para este projecto).
 - Livros sem reviews devolvem raiting: null.
 - Campo "raiting" respeita o typo do enunciado propositadamente.
 
@@ -362,11 +362,10 @@ Criado em Semana 6 (30 Abr 2026, em atraso relativamente ao planeado).
 Endpoint 14 adicionado em Semana 7 (30 Abr 2026).
 
 AVAIL.2 (endpoint 11) — livros disponíveis num género.
-  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY r.rating) para calcular a
-  mediana do rating. É uma ordered-set aggregate function, não uma window
-  function (não usa OVER) — não viola a restrição do projecto.
+  AVG(r.rating) para calcular a média do rating — confirmado com o professor
+  como abordagem correcta para este projecto.
   HAVING garante que só retorna livros com available_copies > 0.
-  Livros sem reviews devolvem raiting: null (LEFT JOIN + PERCENTILE_CONT).
+  Livros sem reviews devolvem raiting: null (LEFT JOIN + AVG).
   Campo mantém o typo "raiting" conforme o enunciado.
 
 CHECK.1/2 (endpoint 12) — informação do livro + reviews.
@@ -386,16 +385,17 @@ BORROW.1-5 (endpoint 13) — criar empréstimo com SELECT FOR UPDATE.
   passo 4 falhe (e.g., race condition antes do lock ser adquirido).
   Documentação detalhada da estratégia FOR UPDATE em report.txt, endpoint 13.
 
-REV.1-4 (endpoint 14) — submeter review.
-  Sequência de 4 verificações antes do INSERT:
+REV.1-3 (endpoint 14) — submeter review (upsert).
+  Sequência dentro de uma transação:
     1. REV.1 → livro existe (400 se não)
     2. REV.2 → utilizador já emprestou o livro pelo menos uma vez, activo ou
                devolvido (LIMIT 1 para eficiência); 400 se nunca emprestou
-    3. REV.3 → utilizador ainda não tem review para este livro; retorna erro
-               claro em vez de deixar a PK (books_isbn, users_user_id) falhar
-    4. REV.4 → INSERT INTO reviews; review_date fica com DEFAULT NOW() do schema
-  comment é opcional (pode ser NULL). Rating validado pela constraint
-  chk_reviews_rating (CHECK BETWEEN 1 AND 5) como segunda linha de defesa.
+    3. REV.3 → UPSERT: INSERT ... ON CONFLICT (books_isbn, users_user_id)
+               DO UPDATE SET rating, comment, review_date = NOW()
+               Se não existe review → INSERT; se já existe → UPDATE.
+               Permite que o utilizador actualize a sua review sem erro.
+  comment é opcional (pode ser NULL). Rating validado em Python (1 ≤ rating ≤ 5)
+  e pela constraint chk_reviews_rating como segunda linha de defesa.
 
 ─────────────────────────────────────────
 db/populate_data.sql — correcções Semana 7
@@ -420,18 +420,3 @@ Três problemas detectados e corrigidos em 30 Abr 2026:
     Cabeçalho dizia "4 históricos + 1 ativo" (= 500, não 600) e a secção 8
     dizia "500 históricos" quando o código gerava apenas 400. Todos os
     comentários actualizados para reflectir os valores correctos.
-
-
-═════════════════════════════════════════
-PONTOS A DISCUTIR COM PROFESSOR
-═════════════════════════════════════════
-
-1. Autenticação: body JSON vs HTTP Authorization header
-   O enunciado mostra credenciais no body JSON de cada pedido.
-   Implementação actual lê username/password do request.get_json().
-   Confirmar se os testes automáticos esperam este formato.
-
-2. Endpoint 11 — Mediana vs Média no rating
-   O enunciado especifica "median" → implementado com PERCENTILE_CONT(0.5).
-   A média (AVG) seria mais intuitiva e é o padrão em sistemas reais.
-   Se aceite, trocar para AVG(r.rating) — mudança de uma linha.
