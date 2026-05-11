@@ -75,9 +75,10 @@ def register_user():
 
 
 # ── 11. GET /available_books_by_genre ────────────────────────────────────────
-# Endpoint público — sem autenticação necessária.
+# Qualquer utilizador autenticado (admin, librarian ou reader).
 @user_bp.route('/available_books_by_genre', methods=['GET'])
-def available_books_by_genre():
+@require_role('admin', 'librarian', 'reader')
+def available_books_by_genre(user_id, role):
     data = request.get_json()
 
     if not data or "genre_id" not in data:
@@ -135,9 +136,10 @@ def available_books_by_genre():
 
 
 # ── 12. GET /check_book ───────────────────────────────────────────────────────
-# Endpoint público — sem autenticação necessária.
+# Qualquer utilizador autenticado (admin, librarian ou reader).
 @user_bp.route('/check_book', methods=['GET'])
-def check_book():
+@require_role('admin', 'librarian', 'reader')
+def check_book(user_id, role):
     data = request.get_json()
 
     if not data or "ISBN" not in data:
