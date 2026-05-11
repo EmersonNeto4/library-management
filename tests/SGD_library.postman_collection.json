@@ -275,7 +275,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"genre_id\": 1\n}",
+					"raw": "{\n    \"username\": \"reader1\",\n    \"password\": \"password123\",\n    \"genre_id\": 1\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -299,7 +299,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"ISBN\": \"9780000000001\"\n}",
+					"raw": "{\n    \"username\": \"reader1\",\n    \"password\": \"password123\",\n    \"ISBN\": \"9780000000001\"\n}",
 					"options": {
 						"raw": {
 							"language": "json"
