@@ -138,7 +138,7 @@ ENDPOINTS IMPLEMENTADOS
 ─────────────────────────────────────────
 11. GET /available_books_by_genre (user.py)
 ─────────────────────────────────────────
-- Acesso: público (sem autenticação)
+- Acesso: qualquer utilizador autenticado (@require_role admin, librarian, reader)
 - Parâmetro: genre_id (integer) no body JSON
 - Devolve apenas livros com available_copies > 0.
 - rating calculado via AVG(r.rating) — confirmado com o professor (média em
@@ -149,7 +149,7 @@ ENDPOINTS IMPLEMENTADOS
 ─────────────────────────────────────────
 12. GET /check_book (user.py)
 ─────────────────────────────────────────
-- Acesso: público (sem autenticação)
+- Acesso: qualquer utilizador autenticado (@require_role admin, librarian, reader)
 - Parâmetro: ISBN no body JSON
 - overall_rating via AVG(r.rating) — o enunciado não especifica mediana aqui.
 - Duas queries: 1ª obtém title + overall_rating; 2ª obtém lista de reviews.

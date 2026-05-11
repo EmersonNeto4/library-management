@@ -9,8 +9,7 @@
 -- =============================================
 -- NOTAS PARA O ELEMENTO B (API):
 --   - Parâmetros via %(param)s (nunca concatenar strings!)
---   - Endpoints 11 e 12 são PÚBLICOS (sem autenticação)
---   - Endpoint 13 requer qualquer utilizador autenticado
+--   - Endpoints 11, 12 e 13 requerem qualquer utilizador autenticado
 --     (admin, librarian ou reader)
 --   - Endpoint 13 usa transação com SELECT FOR UPDATE
 --     para garantir atomicidade em cenários concorrentes
@@ -20,7 +19,7 @@
 -- =============================================
 -- ENDPOINT 11 — Available Books by Genre
 -- GET /sgdproj/available_books_by_genre
--- PÚBLICO (sem autenticação)
+-- ADMIN, LIBRARIAN e READER (qualquer autenticado)
 -- =============================================
 -- Parâmetros: %(genre_id)s
 -- Lista livros com cópias disponíveis (available_copies > 0)
@@ -64,7 +63,7 @@ ORDER BY b.title;
 -- =============================================
 -- ENDPOINT 12 — Check Book
 -- GET /sgdproj/check_book
--- PÚBLICO (sem autenticação)
+-- ADMIN, LIBRARIAN e READER (qualquer autenticado)
 -- =============================================
 -- Parâmetros: %(ISBN)s
 -- Retorna informação do livro + rating médio + lista de reviews.
