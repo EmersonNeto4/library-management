@@ -213,6 +213,9 @@ def borrow_book(user_id, role):
     borrower_id = data["user_id"]
     isbn = data["ISBN"]
 
+    if borrower_id != user_id:
+        return make_response(400, errors="user_id não corresponde ao utilizador autenticado")
+
     conn = get_connection()
     cur = conn.cursor()
     try:
@@ -297,6 +300,9 @@ def submit_review(user_id, role):
     rating = data["rating"]
     comment = data["comment"]
 
+    if reviewer_id != user_id:
+        return make_response(400, errors="user_id não corresponde ao utilizador autenticado")
+
     if not isinstance(rating, int) or not (1 <= rating <= 5):
         return make_response(400, errors="rating deve ser um inteiro entre 1 e 5")
 
@@ -354,6 +360,9 @@ def return_book(user_id, role):
 
     borrower_id = data["user_id"]
     isbn = data["ISBN"]
+
+    if borrower_id != user_id:
+        return make_response(400, errors="user_id não corresponde ao utilizador autenticado")
 
     conn = get_connection()
     cur = conn.cursor()
