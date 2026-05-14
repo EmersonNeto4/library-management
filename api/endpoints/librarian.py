@@ -230,7 +230,7 @@ def loaned_book(user_id, role):
 @require_role('admin', 'librarian')
 def top_loaned_books(user_id, role, n):
     if n < 1:
-        return make_response(400, errors="N deve ser maior que 0")
+        return make_response(400, errors="N (Top N) deve ser maior que 0")
 
     conn = get_connection()
     cur = conn.cursor()
