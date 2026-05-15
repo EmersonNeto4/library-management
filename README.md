@@ -19,7 +19,7 @@ REST API for a library management system developed for the Data Management Syste
 ### 1. Clone the repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/EmersonNeto4/library-management.git
 cd library-management
 ```
 
