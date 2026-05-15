@@ -48,7 +48,7 @@ Create a `.env` file in the project root with the following content:
 ```env
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=library
+DB_NAME=library_db
 DB_USER=<your_postgres_user>
 DB_PASSWORD=<your_postgres_password>
 ```
