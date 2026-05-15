@@ -1,0 +1,416 @@
+{
+	"info": {
+		"name": "SGD_library",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Register User (reader)",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"reader_test\",\n    \"email\": \"reader_test@mail.com\",\n    \"password\": \"password123\",\n    \"role\": \"reader\",\n    \"n_estudante\": 2020999999\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/user",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "user"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "1. Register User (librarian)",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"librarian_test\",\n    \"email\": \"librarian_test@mail.com\",\n    \"password\": \"password123\",\n    \"role\": \"librarian\",\n    \"n_mec\": 99999\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/user",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "user"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "2. Add Book",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\",\n    \"ISBN\": \"978-TEST-001\",\n    \"book_name\": \"Livro de Teste\",\n    \"author\": \"Autor Teste\",\n    \"book_description\": \"Descrição do livro de teste.\",\n    \"pages\": 300,\n    \"copies\": 5,\n    \"genres\": [\"Fiction\"]\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/book",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "book"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "3. Update Copies",
+			"request": {
+				"method": "PUT",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\",\n    \"ISBN\": \"978-TEST-001\",\n    \"copies\": 10\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/update_copies",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "update_copies"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "4. List Books by Genre",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\",\n    \"genre_id\": 1\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/list_books_by_genre",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "list_books_by_genre"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "5. Find Book by Name",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\",\n    \"book_name\": \"Dune\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/find_book_by_name",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "find_book_by_name"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "6. Find Book by ISBN",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\",\n    \"ISBN\": \"9780000000001\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/find_book_by_isbn",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "find_book_by_isbn"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "7. Loaned Books",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/loaned_books",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "loaned_books"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "8. Loaned Book (history by ISBN)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\",\n    \"ISBN\": \"9780000000001\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/loaned_book",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "loaned_book"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "9. Top N Loaned Books",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/TopLoanedBooks/5",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "TopLoanedBooks", "5"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "10. Top N Loaners",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/TopLoaners/5",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "TopLoaners", "5"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "11. Available Books by Genre",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"reader1\",\n    \"password\": \"password123\",\n    \"genre_id\": 1\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/available_books_by_genre",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "available_books_by_genre"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "12. Check Book Reviews",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"reader1\",\n    \"password\": \"password123\",\n    \"ISBN\": \"9780000000001\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/check_book",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "check_book"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "13. Borrow Book",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"reader1\",\n    \"password\": \"password123\",\n    \"user_id\": 1,\n    \"ISBN\": \"9780000000001\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/borrow_book",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "borrow_book"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "14. Submit Review",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"reader1\",\n    \"password\": \"password123\",\n    \"user_id\": 1,\n    \"ISBN\": \"9780000000001\",\n    \"rating\": 4,\n    \"comment\": \"Muito bom livro!\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/report/submit_review",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "report", "submit_review"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "15. Return Book",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"reader1\",\n    \"password\": \"password123\",\n    \"user_id\": 1,\n    \"ISBN\": \"9780000000001\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/return_book",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "return_book"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "16. Top N Loaned Genres (12 months)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin1\",\n    \"password\": \"password123\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/sgdproj/report/TopLoanedGenres12Months/5",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["sgdproj", "report", "TopLoanedGenres12Months", "5"]
+				}
+			},
+			"response": []
+		}
+	]
+}
