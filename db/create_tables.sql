@@ -163,7 +163,7 @@ ALTER TABLE reviews
 -- UNIQUE (users_user_id, books_isbn) já garantido pela PRIMARY KEY — não é necessário
 
 
--- ── 8. FK — herança (admin, librarian, reader) ─
+-- ── 8. FK + CONSTRAINTS — herança (admin, librarian, reader) ─
 
 ALTER TABLE admin
     ADD CONSTRAINT admin_fk1
@@ -173,9 +173,15 @@ ALTER TABLE librarian
     ADD CONSTRAINT librarian_fk1
         FOREIGN KEY (users_user_id) REFERENCES users(user_id);
 
+ALTER TABLE librarian
+    ADD CONSTRAINT unique_n_mec UNIQUE (n_mec);
+
 ALTER TABLE reader
     ADD CONSTRAINT reader_fk1
         FOREIGN KEY (users_user_id) REFERENCES users(user_id);
+
+ALTER TABLE reader
+    ADD CONSTRAINT unique_n_estudante UNIQUE (n_estudante);
 
 
 -- ── 9. FK — author_books, books_genres ────────

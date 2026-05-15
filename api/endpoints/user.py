@@ -54,11 +54,17 @@ def register_user():
         new_user_id = cur.fetchone()[0]
 
         if new_role == "librarian":
+            cur.execute("SELECT users_user_id FROM librarian WHERE n_mec = %s", (data["n_mec"],))
+            if cur.fetchone():
+                return make_response(400, errors="n_mec já está registado")
             cur.execute(
                 "INSERT INTO librarian (users_user_id, n_mec) VALUES (%s, %s)",
                 (new_user_id, data["n_mec"])
             )
         else:
+            cur.execute("SELECT users_user_id FROM reader WHERE n_estudante = %s", (data["n_estudante"],))
+            if cur.fetchone():
+                return make_response(400, errors="n_estudante já está registado")
             cur.execute(
                 "INSERT INTO reader (users_user_id, n_estudante) VALUES (%s, %s)",
                 (new_user_id, data["n_estudante"])
